@@ -145,25 +145,22 @@ browser()
 Init <- function(sim) {
   # # ! ----- EDIT BELOW ----- ! #
 
-browser()
   ## TODO: inventory all files to ensure correct dir structure? compare against expected files?
   #filesUserHas <- fs::dir_ls(P(sim)$simOutputPath, recurse = TRUE, type = "file", glob = "*.qs")
 
-  filesUserExpects <- rbindlist(
-    lapply(studyAreaNames, function(studyAreaName) {
-      rbindlist(lapply(climateScenarios, function(cs) {
-        rbindlist(lapply(reps, function(rep) {
-          runName <- sprintf("%s_%s_run%0d", studyAreaName, cs, run)
-          f <- file.path("outputs", runName, paste0(runName, ".qs"))
+  filesUserExpects <- rbindlist(lapply(P(sim)$studyAreaNames, function(studyAreaName) {
+    rbindlist(lapply(P(sim)$climateScenarios, function(climateScenario) {
+      rbindlist(lapply(P(sim)$reps, function(rep) {
+        runName <- sprintf("%s_%s_run%02d", studyAreaName, climateScenario, as.integer(rep))
+        f <- file.path(P(sim)$simOutputPath, runName, paste0(runName, ".qs"))
 
-          data.table(file = f, exists = file.exists(f))
-        }))
+        data.table(file = f, exists = file.exists(f))
       }))
-    })
-  )
+    }))
+  }))
 
-  if (!all(allSimFiles$exists)) {
-    missing <- allSimFiles[exists == FALSE, ]$file
+  if (!all(filesUserExpects$exists)) {
+    missing <- filesUserExpects[exists == FALSE, ]$file
     stop("Some simulation files missing:\n", paste(missing, collapse = "\n"))
   }
 
