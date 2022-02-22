@@ -15,7 +15,7 @@ defineModule(sim, list(
   citation = list("citation.bib"),
   documentation = list("README.md", "fireSense_summary.Rmd"), ## same file
   reqdPkgs = list("assertthat", "cowplot", "data.table", "fs",
-                  "PredictiveEcology/fireSenseUtils (>= 0.05.9013)", "ggplot2", "googledrive",
+                  "PredictiveEcology/fireSenseUtils (>= 0.0.5.9015)", "ggplot2", "googledrive",
                   "raster", "rasterVis", "RColorBrewer", "SpaDES.core (>= 1.0.10)", "SpaDES.tools", "qs"),
   parameters = rbind(
     #defineParameter("paramName", "paramClass", value, min, max, "parameter description"),
@@ -114,8 +114,10 @@ browser()
           plotHistoricFires(
             climateScenario = climateScenario,
             studyAreaName = studyAreaName,
+            outputDir = P(sim)$simOutputPath,
             firePolys = mod$firePolys,
-            outputDir = P(sim)$simOutputPath)
+            ignitionPoints = mod$ignitionFirePoints
+          )
         })
       })
       files2upload <- unlist(files2upload, recursive = TRUE)
