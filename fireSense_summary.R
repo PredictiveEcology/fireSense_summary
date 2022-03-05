@@ -36,6 +36,12 @@ defineModule(sim, list(
   ),
   inputObjects = bindrows(
     #expectsInput("objectName", "objectClass", "input object description", sourceURL, ...),
+    expectsInput("burnMap", "RasterLayer",
+                 "loaded from disk (i.e., from files in `simOutputPath`).",
+                 sourceURL = NA),
+    expectsInput("burnSummary", "data.table",
+                 "loaded from disk (i.e., from files in `simOutputPath`).",
+                 sourceURL = NA),
     expectsInput("rasterToMatch", "RasterLayer", "DESCRIPTION NEEDED", sourceURL = NA),
     expectsInput("uploadTo", "character",
                  desc = paste("if `upload = TRUE`, a named list of Google Drive folder ids,",
