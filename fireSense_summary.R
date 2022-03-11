@@ -15,8 +15,9 @@ defineModule(sim, list(
   citation = list("citation.bib"),
   documentation = list("README.md", "fireSense_summary.Rmd"), ## same file
   reqdPkgs = list("assertthat", "cowplot", "data.table", "fs",
-                  "PredictiveEcology/fireSenseUtils (>= 0.0.5.9015)", "ggplot2", "googledrive",
-                  "raster", "rasterVis", "RColorBrewer", "SpaDES.core (>= 1.0.10)", "SpaDES.tools", "qs"),
+                  "PredictiveEcology/fireSenseUtils (>= 0.0.5.9021)",
+                  "ggplot2", "googledrive", "purrr", "raster", "rasterVis", "RColorBrewer",
+                  "SpaDES.core (>= 1.0.10)", "SpaDES.tools", "qs"),
   parameters = rbind(
     #defineParameter("paramName", "paramClass", value, min, max, "parameter description"),
     defineParameter("climateScenarios", "character", NA, NA, NA,
@@ -28,7 +29,9 @@ defineModule(sim, list(
     defineParameter("studyAreaNames", "character", NA, NA, NA,
                     desc = "names of study areas simulated."),
     defineParameter("reps", "integer", 1:10, 1, NA,
-                    desc = "number of replicates/runs per study area and climate scenario."),
+                    desc = paste("number of replicates/runs per study area and climate scenario.",
+                                 "NOTE: `mclapply` is used internally, so you should set",
+                                 "`options(mc.cores = nReps)` to run in parallel.")),
     defineParameter("upload", "logical", FALSE, NA, NA,
                     desc = "if TRUE, uses the `googledrive` package to upload figures."),
     defineParameter("years", "integer", c(2011, 2100), NA, NA,
@@ -68,21 +71,24 @@ doEvent.fireSense_summary = function(sim, eventTime, eventType) {
       sim <- Init(sim)
 
       # schedule future event(s)
-      sim <- scheduleEvent(sim, P(sim)$.plotInitialTime, "fireSense_summary", "plot_burnSummary")
-      sim <- scheduleEvent(sim, P(sim)$.plotInitialTime, "fireSense_summary", "plot_cumulBurn")
-      sim <- scheduleEvent(sim, P(sim)$.plotInitialTime, "fireSense_summary", "plot_historic")
-      sim <- scheduleEvent(sim, P(sim)$.saveInitialTime, "fireSense_summary", "upload", .last())
+      sim <- scheduleEvent(sim, start(sim), "fireSense_summary", "plot_burnSummary")
+      sim <- scheduleEvent(sim, start(sim), "fireSense_summary", "plot_cumulBurn")
+      sim <- scheduleEvent(sim, start(sim), "fireSense_summary", "plot_historic")
+
+      if (isTRUE(P(sim)$upload)) {
+        sim <- scheduleEvent(sim, end(sim), "fireSense_summary", "upload", .last())
+      }
     },
     plot_burnSummary = {
       # ! ----- EDIT BELOW ----- ! #
-browser()
+
       files2upload <- lapply(P(sim)$studyAreaNames, function(studyAreaName) {
         lapply(P(sim)$climateScenarios, function(climateScenario) {
           plotBurnSummary(
-            Nreps = P(sim)$reps,
             studyAreaName = studyAreaName,
             climateScenario = climateScenario,
             outputDir = P(sim)$simOutputPath,
+            Nreps = P(sim)$reps
           )
         })
       })
@@ -94,14 +100,14 @@ browser()
     },
     plot_cumulBurn = {
       # ! ----- EDIT BELOW ----- ! #
-browser()
+
       files2upload <- lapply(P(sim)$studyAreaNames, function(studyAreaName) {
         lapply(P(sim)$climateScenarios, function(climateScenario) {
           plotCumulativeBurns(
-            Nreps = P(sim)$reps,
             studyAreaName = studyAreaName,
             climateScenario = climateScenario,
             outputDir = P(sim)$simOutputPath,
+            Nreps = P(sim)$reps,
             rasterToMatch = sim$rasterToMatch
           )
         })
@@ -114,7 +120,7 @@ browser()
     },
     plot_historic = {
       # ! ----- EDIT BELOW ----- ! #
-browser()
+
       files2upload <- lapply(P(sim)$studyAreaNames, function(studyAreaName) {
         lapply(P(sim)$climateScenarios, function(climateScenario) {
           plotHistoricFires(
@@ -134,11 +140,12 @@ browser()
     },
     upload = {
       # ! ----- EDIT BELOW ----- ! #
-browser()
-      lapply(mod$files2upload, function(f) {
-        drive_put(f, sim$uploadTo[[P(sim)$studyAreaName]], basename(f))
-      })
+      mod$files2upload <- set_names(mod$files2upload, basename(mod$files2upload))
 
+      gid <- as_id(sim$uploadTo[[P(sim)$studyAreaName]])
+      prevUploaded <- drive_ls(gid)
+      toUpload <- mod$files2upload[!(basename(mod$files2upload) %in% prevUploaded$name)]
+      uploaded <- map(toUpload, ~ drive_upload(.x, path = gid))
       # ! ----- STOP EDITING ----- ! #
     },
     warning(paste("Undefined event type: \'", current(sim)[1, "eventType", with = FALSE],
@@ -199,12 +206,14 @@ Init <- function(sim) {
 
   # ! ----- EDIT BELOW ----- ! #
 
-  ## same RTM for all sims, so it doesn't matter which one we load
-  sim_SA <- loadSimList(file.path("outputs", P(sim)$studyAreaNames[[1]],
-                                  paste0("simOutPreamble_", P(sim)$studyAreaNames[[1]], "_",
-                                         gsub("SSP", "", P(sim)$climateScenarios[[1]]), ".qs")))
-  sim$rasterToMatch <- simsimSA$rasterToMatchReporting
-  rm(sim_SA)
+  if (!suppliedElsewhere("rasterToMatch", sim)) {
+    ## same RTM for all sims, so it doesn't matter which one we load
+    sim_SA <- loadSimList(file.path("outputs", P(sim)$studyAreaNames[[1]],
+                                    paste0("simOutPreamble_", P(sim)$studyAreaNames[[1]], "_",
+                                           gsub("SSP", "", P(sim)$climateScenarios[[1]]), ".qs")))
+    sim$rasterToMatch <- sim_SA$rasterToMatchReporting
+    rm(sim_SA)
+  }
 
   ## same historic fire polygons for all sims, so it doesn't matter which one we load
   sim_fsDP <- loadSimList(file.path("outputs", P(sim)$studyAreaNames[[1]],
