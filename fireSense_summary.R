@@ -15,7 +15,7 @@ defineModule(sim, list(
   citation = list("citation.bib"),
   documentation = list("README.md", "fireSense_summary.Rmd"), ## same file
   reqdPkgs = list("assertthat", "cowplot", "data.table", "fs",
-                  "PredictiveEcology/fireSenseUtils@development (>= 0.0.5.9022)",
+                  "PredictiveEcology/fireSenseUtils@development (>= 0.0.5.9048)",
                   "ggplot2", "googledrive", "purrr", "raster", "rasterVis", "RColorBrewer",
                   "SpaDES.core (>= 1.0.10)", "SpaDES.tools", "qs"),
   parameters = rbind(
@@ -88,7 +88,7 @@ doEvent.fireSense_summary = function(sim, eventTime, eventType) {
             studyAreaName = studyAreaName,
             climateScenario = climateScenario,
             outputDir = P(sim)$simOutputPath,
-            Nreps = P(sim)$reps
+            Nreps = max(P(sim)$reps)
           )
         })
       })
@@ -102,12 +102,19 @@ doEvent.fireSense_summary = function(sim, eventTime, eventType) {
       # ! ----- EDIT BELOW ----- ! #
 
       files2upload <- lapply(P(sim)$studyAreaNames, function(studyAreaName) {
+        ## get rasterToMatch for each studyArea
+        tmp <- loadSimList(file.path(P(sim)$simOutputPath, studyAreaName,
+                                     paste0("simOutPreamble_", studyAreaName, "_",
+                                            gsub("SSP", "", P(sim)$climateScenarios[1]), ".qs")))
+        sim$rasterToMatch <- tmp$rasterToMatchReporting
+        rm(tmp)
+
         lapply(P(sim)$climateScenarios, function(climateScenario) {
           plotCumulativeBurns(
             studyAreaName = studyAreaName,
             climateScenario = climateScenario,
             outputDir = P(sim)$simOutputPath,
-            Nreps = P(sim)$reps,
+            Nreps = max(P(sim)$reps),
             rasterToMatch = sim$rasterToMatch
           )
         })
@@ -161,14 +168,17 @@ doEvent.fireSense_summary = function(sim, eventTime, eventType) {
 Init <- function(sim) {
   # # ! ----- EDIT BELOW ----- ! #
 
+  checkPath(file.path(P(sim)$simOutputPath, P(sim)$studyAreaNames, "figures"), create = TRUE)
+
   ## TODO: inventory all files to ensure correct dir structure? compare against expected files?
   #filesUserHas <- fs::dir_ls(P(sim)$simOutputPath, recurse = TRUE, type = "file", glob = "*.qs")
 
   filesUserExpects <- rbindlist(lapply(P(sim)$studyAreaNames, function(studyAreaName) {
     rbindlist(lapply(P(sim)$climateScenarios, function(climateScenario) {
       rbindlist(lapply(P(sim)$reps, function(rep) {
-        runName <- sprintf("%s_%s_run%02d", studyAreaName, climateScenario, as.integer(rep))
-        f <- file.path(P(sim)$simOutputPath, runName, paste0(runName, ".qs"))
+        runName <- sprintf("%s_%s", studyAreaName, climateScenario)
+        f <- file.path(P(sim)$simOutputPath, runName, sprintf("rep%02d", as.integer(rep)),
+                       paste0(runName, "_", sprintf("rep%02d", as.integer(rep)), ".qs"))
 
         data.table(file = f, exists = file.exists(f))
       }))
@@ -205,15 +215,6 @@ Init <- function(sim) {
   message(currentModule(sim), ": using dataPath '", dPath, "'.")
 
   # ! ----- EDIT BELOW ----- ! #
-
-  if (!suppliedElsewhere("rasterToMatch", sim)) {
-    ## same RTM for all sims, so it doesn't matter which one we load
-    sim_SA <- loadSimList(file.path("outputs", P(sim)$studyAreaNames[[1]],
-                                    paste0("simOutPreamble_", P(sim)$studyAreaNames[[1]], "_",
-                                           gsub("SSP", "", P(sim)$climateScenarios[[1]]), ".qs")))
-    sim$rasterToMatch <- sim_SA$rasterToMatchReporting
-    rm(sim_SA)
-  }
 
   ## same historic fire polygons for all sims, so it doesn't matter which one we load
   sim_fsDP <- loadSimList(file.path("outputs", P(sim)$studyAreaNames[[1]],
