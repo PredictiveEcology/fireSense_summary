@@ -14,7 +14,7 @@ defineModule(sim, list(
   timeunit = "year",
   citation = list("citation.bib"),
   documentation = list("README.md", "fireSense_summary.Rmd"), ## same file
-  reqdPkgs = list("assertthat", "cowplot", "data.table", "fs",
+  reqdPkgs = list("assertthat", "cowplot", "data.table", "disk.frame", "fs",
                   "PredictiveEcology/fireSenseUtils@development (>= 0.0.5.9048)",
                   "ggplot2", "googledrive", "purrr", "raster", "rasterVis", "RColorBrewer",
                   "SpaDES.core (>= 1.0.10)", "SpaDES.tools", "qs"),
