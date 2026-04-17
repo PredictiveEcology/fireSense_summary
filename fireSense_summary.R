@@ -113,7 +113,7 @@ doEvent.fireSense_summary = function(sim, eventTime, eventType) {
       sim <- registerOutputs(f_burnMap, sim)
 
       f_burnSummary <- file.path(outputPath(sim), "fireSense_burnSummary.csv")
-      data.table::fwrite(burnSummary, file = f_burnSummary)
+      data.table::fwrite(sim$burnSummary, file = f_burnSummary)
       sim <- registerOutputs(f_burnSummary, sim)
     },
     noEventWarning(sim)
