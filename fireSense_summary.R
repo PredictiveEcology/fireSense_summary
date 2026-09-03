@@ -141,13 +141,7 @@ InitMulti <- function(sim) {
   ## check for necessary output files -----------------------------------------------
   ## NOTE: don't load simLists -- slow and unreliable
   mod$useOutputs <- NROW(sim$outputsDF) > 0
-  if (mod$useOutputs) {
-    reps_str <- sub(".*/rep(\\d+)/.*", "\\1", sim$outputsDF$file)
-    mod$allReps <- paste0("rep", sort(unique(reps_str[as.integer(reps_str) %in% Par$reps])))
-
-  } else {
-    mod$allReps <- sprintf("rep%02d", P(sim)$reps)
-  }
+  mod$allReps <- dirnamesFromSet(sim$outputsDF$file, P(sim)$reps)
   padL <- ceiling(log10(P(sim)$years[2] + 1))
   padYearStart <- paddedFloatToChar(P(sim)$years[1], padL = padL)
   padYearEnd <- paddedFloatToChar(P(sim)$years[2], padL = padL)
