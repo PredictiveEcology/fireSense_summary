@@ -51,6 +51,16 @@ defineModule(sim, list(
     expectsInput("burnSummary", "data.table",
                  paste("Fire summary table from `fireSense`.", "Required in single mode."),
                  sourceURL = NA),
+    expectsInput("firePolys", "list", sourceURL = NA,
+                 paste0("Optional. This module will download this if it does not exist. ",
+                        "List of sf polygon objects representing annual fire polygons.")),
+    expectsInput("ignitionFirePoints", "SpatVector", sourceURL = NA,
+                 paste0("Optional. This module will download this if it does not exist. ",
+                        "Historical fire ignition points.")),
+    expectsInput("outputsDF", "data.table",
+                 desc = paste("The rbindlisted outputs(sim) of all the sims being used; i.e., it ",
+                              "will contain all the files that may exist"),
+                 sourceURL = NA),
     expectsInput("rasterToMatch", "SpatRaster",
                  paste("template raster used by the simulations for summary reporting"),
                  sourceURL = NA)
@@ -80,7 +90,8 @@ doEvent.fireSense_summary = function(sim, eventTime, eventType) {
           outputDir = P(sim)$simOutputPath,
           Nreps = max(P(sim)$reps),
           years = P(sim)$years,
-          pixelSize = unique(terra::res(sim$rasterToMatch))
+          pixelSize = unique(terra::res(sim$rasterToMatch)),
+          simFiles = mod$simFiles
         )
         sim <- registerOutputs(f_burnSummary_plot, sim)
 
@@ -90,17 +101,19 @@ doEvent.fireSense_summary = function(sim, eventTime, eventType) {
           outputDir = P(sim)$simOutputPath,
           Nreps = max(P(sim)$reps),
           years = P(sim)$years,
-          rasterToMatch = sim$rasterToMatch
+          rasterToMatch = sim$rasterToMatch,
+          simFiles = mod$simFiles
         )
         sim <- registerOutputs(f_cumulBurn_plot, sim)
 
         f_historic_plot <- fireSenseUtils::plotHistoricFires(
-          climateScenario = P(sim)$climateScenario,
+          climateScenario = as.character(P(sim)$climateScenario),
           studyAreaName = P(sim)$studyAreaName,
           outputDir = P(sim)$simOutputPath,
           pixelSize = unique(terra::res(sim$rasterToMatch)),
           firePolys = mod$firePolys,
-          ignitionPoints = mod$ignitionFirePoints
+          ignitionPoints = mod$ignitionFirePoints,
+          simFiles = mod$simFiles
         )
         sim <- registerOutputs(f_historic_plot, sim)
       }
@@ -124,111 +137,163 @@ doEvent.fireSense_summary = function(sim, eventTime, eventType) {
 InitMulti <- function(sim) {
   # # ! ----- EDIT BELOW ----- ! #
 
+  browser()
   ## check for necessary output files -----------------------------------------------
-  allReps <- sprintf("rep%02d", P(sim)$reps)
+  ## NOTE: don't load simLists -- slow and unreliable
+  mod$useOutputs <- NROW(sim$outputsDF) > 0
+  if (mod$useOutputs) {
+    reps_str <- sub(".*/rep(\\d+)/.*", "\\1", sim$outputsDF$file)
+    mod$allReps <- paste0("rep", sort(unique(reps_str[as.integer(reps_str) %in% Par$reps])))
+
+  } else {
+    mod$allReps <- sprintf("rep%02d", P(sim)$reps)
+  }
   padL <- ceiling(log10(P(sim)$years[2] + 1))
   padYearStart <- paddedFloatToChar(P(sim)$years[1], padL = padL)
   padYearEnd <- paddedFloatToChar(P(sim)$years[2], padL = padL)
 
   checkPath(file.path(P(sim)$simOutputPath, "figures", currentModule(sim)), create = TRUE)
 
-  bmbs <- fs::dir_ls(
-    P(sim)$simOutputPath,
-    regexp = "burnMap|burnSummary",
-    recurse = 1,
-    type = "file"
-  ) |>
-    grep(paste0("(", paste0(P(sim)$reps, collapse = "|"), ")"), x = _, value = TRUE) |>
-    grep(paste0("_year(", paste0(P(sim)$years, collapse = "|"), ")"), x = _, value = TRUE)
+  if (mod$useOutputs) {
+    mod$bmbs <- grep(
+      value = TRUE,
+      sim$outputsDF$file,
+      pattern = "burnMap|burnSummary"
+    ) |>
+      grep(paste0("(", paste0(mod$allReps, collapse = "|"), ")"), x = _, value = TRUE) |>
+      grep("gri|png|txt|xml", x = _, value = TRUE, invert = TRUE)
 
-  filesUserHas <- c(bmbs)
+    ## the per-rep outputs are not necessarily under `simOutputPath`/repNN (e.g. runs
+    ## restored from another machine), so let the plotting functions use these paths
+    mod$simFiles <- mod$bmbs
+  } else {
+    mod$bmbs <- fs::dir_ls(
+      P(sim)$simOutputPath,
+      regexp = "burnMap|burnSummary",
+      recurse = 1,
+      type = "file"
+    ) |>
+      grep(paste0("(", paste0(P(sim)$reps, collapse = "|"), ")"), x = _, value = TRUE) |>
+      grep(paste0("_year(", paste0(P(sim)$years, collapse = "|"), ")"), x = _, value = TRUE)
 
-  dirsExpected <- file.path(P(sim)$simOutputPath, allReps)
-  filesExpected <- as.character(sapply(dirsExpected, function(d) {
-    c(
-      file.path(d, sprintf("burnMap_year%04d.tif", P(sim)$years[2])),
-      file.path(d, "fireSense_burnSummary.csv")
-    )
-  }))
+    filesUserHas <- c(mod$bmbs)
 
-  filesNeeded <- data.frame(file = filesExpected, exists = filesExpected %in% filesUserHas)
+    dirsExpected <- file.path(P(sim)$simOutputPath, mod$allReps)
+    filesExpected <- as.character(sapply(dirsExpected, function(d) {
+      c(
+        file.path(d, sprintf("burnMap_year%04d.tif", P(sim)$years[2])),
+        file.path(d, "fireSense_burnSummary.csv")
+      )
+    }))
 
-  if (!all(filesNeeded$exists)) {
-    missing <- filesNeeded[filesNeeded$exists == FALSE, ]$file
-    stop(
-      sum(!filesNeeded$exists),
-      " simulation files appear to be missing:\n",
-      paste(missing, collapse = "\n")
-    )
+    filesNeeded <- data.frame(file = filesExpected, exists = filesExpected %in% filesUserHas)
+
+    if (!all(filesNeeded$exists)) {
+      missing <- filesNeeded[filesNeeded$exists == FALSE, ]$file
+      stop(
+        sum(!filesNeeded$exists),
+        " simulation files appear to be missing:\n",
+        paste(missing, collapse = "\n")
+      )
+    }
   }
 
   ## get historical fire points and polys -------------------------------------------
 
   ## TODO: use an updated/working prepInputs version (fireSenseUtils::getFirePolygons?)
-  mod$firePolys <- {
-    dst <- inputPath(sim)
-    nfdb_url <- "https://cwfis.cfs.nrcan.gc.ca/downloads/nfdb/fire_poly/current_version/NFDB_poly.zip"
-    nfdb_zip <- file.path(dst, basename(nfdb_url))
+  if (exists("firePolys", envir(sim))) {
+    mod$firePolys <- sim$firePolys |>
+      tidyterra::bind_spat_rows() |>
+      tidyterra::mutate(
+        YEAR = as.integer(YEAR)
+        #MONTH = as.integer(MONTH),
+        #DAY = as.integer(DAY)
+      )
+  } else {
+    mod$firePolys <- {
+      dst <- inputPath(sim)
+      nfdb_url <- "https://cwfis.cfs.nrcan.gc.ca/downloads/nfdb/fire_poly/current_version/NFDB_poly.zip"
+      nfdb_zip <- file.path(dst, basename(nfdb_url))
 
-    if (!file.exists(nfdb_zip)) {
-      download.file(nfdb_url, destfile = nfdb_zip)
+      if (!file.exists(nfdb_zip)) {
+        download.file(nfdb_url, destfile = nfdb_zip)
+      }
+
+      all_nfdb_files <- fs::dir_ls(dst, regexp = "NFDB_poly_(1972to2020|2021to2024).*")
+
+      if (length(all_nfdb_files) != 16) {
+        archive::archive_extract(nfdb_zip, dst)
+      }
+
+      nfdb_shp <- fs::dir_ls(dst, regexp = "NFDB_poly_(1972to2020|2021to2024).*[.]shp$")
+
+      purrr::map(.x = nfdb_shp, .f = function(x) {
+        p <- terra::vect(x)
+
+        ## NOTE: terra::makeValid takes so long;
+        ## just drop the tiny number of invalid geometries
+        p[terra::is.valid(p), ]
+      }) |>
+        tidyterra::bind_spat_rows() |>
+        tidyterra::mutate(
+          YEAR = as.integer(YEAR),
+          MONTH = as.integer(MONTH),
+          DAY = as.integer(DAY)
+        ) |>
+        terra::project(sim$rasterToMatch)
     }
+  }
 
-    all_nfdb_files <- fs::dir_ls(dst, regexp = "NFDB_poly_(1972to2020|2021to2024).*")
-
-    if (length(all_nfdb_files) != 16) {
-      archive::archive_extract(nfdb_zip, dst)
+  # plotHistoricFires expects SIZE_HA
+  if (!"SIZE_HA" %in% names(mod$firePolys)) {
+    if ("ADJ_HA" %in% names(mod$firePolys)) {
+      mod$firePolys <- mod$firePolys |>
+        tidyterra::mutate(
+          SIZE_HA = ADJ_HA
+        )
+    } else {
+      mod$firePolys <- sim$firePolys |>
+        tidyterra::mutate(
+          SIZE_HA = POLY_HA
+        )
     }
+  }
+  
+  ## TODO: use an updated/working prepInputs version (fireSenseUtils::getFirePoints_NFDB_V2?)
+  if (exists("ignitionFirePoints", envir(sim))) {
+    mod$ignitionFirePoints <- sim$ignitionFirePoints
+  } else {
+    mod$ignitionFirePoints <- {
+      dst <- inputPath(sim)
 
-    nfdb_shp <- fs::dir_ls(dst, regexp = "NFDB_poly_(1972to2020|2021to2024).*[.]shp$")
+      nfdb_url <- "http://cwfis.cfs.nrcan.gc.ca/downloads/nfdb/fire_pnt/current_version/NFDB_point.zip"
+      nfdb_zip <- file.path(dst, basename(nfdb_url))
 
-    purrr::map(.x = nfdb_shp, .f = function(x) {
-      p <- terra::vect(x)
+      if (!file.exists(nfdb_zip)) {
+        download.file(nfdb_url, destfile = nfdb_zip)
+      }
+
+      all_nfdb_files <- fs::dir_ls(dst, regexp = "NFDB_point_.*")
+
+      if (length(all_nfdb_files) != 10) {
+        archive::archive_extract(nfdb_zip, dst)
+      }
+
+      nfdb_shp <- fs::dir_ls(dst, regexp = "NFDB_point_.*[.]shp$")
+
+      ## NOTE: using terra here because it's much faster than sf
+      p <- terra::vect(nfdb_shp)
 
       ## NOTE: terra::makeValid takes so long;
       ## just drop the tiny number of invalid geometries
-      p[terra::is.valid(p), ]
-    }) |>
-      tidyterra::bind_spat_rows() |>
-      tidyterra::mutate(
-        YEAR = as.integer(YEAR),
-        MONTH = as.integer(MONTH),
-        DAY = as.integer(DAY)
-      ) |>
-      terra::project(sim$rasterToMatch)
-  }
-
-  ## TODO: use an updated/working prepInputs version (fireSenseUtils::getFirePoints_NFDB_V2?)
-  mod$ignitionFirePoints <- {
-    dst <- inputPath(sim)
-
-    nfdb_url <- "http://cwfis.cfs.nrcan.gc.ca/downloads/nfdb/fire_pnt/current_version/NFDB_point.zip"
-    nfdb_zip <- file.path(dst, basename(nfdb_url))
-
-    if (!file.exists(nfdb_zip)) {
-      download.file(nfdb_url, destfile = nfdb_zip)
+      p[terra::is.valid(p), ] |>
+        tidyterra::mutate(
+          YEAR = as.integer(YEAR),
+          MONTH = as.integer(MONTH),
+          DAY = as.integer(DAY)
+        ) |>
+        terra::project(sim$rasterToMatch)
     }
-
-    all_nfdb_files <- fs::dir_ls(dst, regexp = "NFDB_point_.*")
-
-    if (length(all_nfdb_files) != 10) {
-      archive::archive_extract(nfdb_zip, dst)
-    }
-
-    nfdb_shp <- fs::dir_ls(dst, regexp = "NFDB_point_.*[.]shp$")
-
-    ## NOTE: using terra here because it's much faster than sf
-    p <- terra::vect(nfdb_shp)
-
-    ## NOTE: terra::makeValid takes so long;
-    ## just drop the tiny number of invalid geometries
-    p[terra::is.valid(p), ] |>
-      tidyterra::mutate(
-        YEAR = as.integer(YEAR),
-        MONTH = as.integer(MONTH),
-        DAY = as.integer(DAY)
-      ) |>
-      terra::project(sim$rasterToMatch)
   }
 
   # ! ----- STOP EDITING ----- ! #
