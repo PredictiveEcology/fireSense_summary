@@ -40,9 +40,10 @@ defineModule(sim, list(
                     desc = paste("number of replicates/runs per study area and climate scenario.",
                                  "NOTE: `mclapply` is used internally, so you should set",
                                  "`options(mc.cores = nReps)` to run in parallel.")),
-    defineParameter("years", "integer", c(2011L, 2100L), NA, NA,
+    defineParameter("years", "integer", c(NA_integer_, NA_integer_), NA, NA,
                     desc = paste("Which two simulation years should be compared?",
-                                 "Typically start and end years."))
+                                 "Typically start and end years.",
+                                 "Defaults to the simulation's own start and end times."))
   ),
   inputObjects = bindrows(
     expectsInput("burnMap", "SpatRaster",
@@ -142,6 +143,8 @@ InitMulti <- function(sim) {
   ## NOTE: don't load simLists -- slow and unreliable
   mod$useOutputs <- NROW(sim$outputsDF) > 0
   mod$allReps <- dirnamesFromSet(sim$outputsDF$file, P(sim)$reps)
+  ## assigned back: P(sim)$years is read downstream, not just for padding
+  P(sim)$years <- resolveSimYears(P(sim)$years, sim)
   pad <- padYears(P(sim)$years)
 
   checkPath(file.path(P(sim)$simOutputPath, "figures", currentModule(sim)), create = TRUE)
