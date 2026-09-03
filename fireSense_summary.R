@@ -142,9 +142,7 @@ InitMulti <- function(sim) {
   ## NOTE: don't load simLists -- slow and unreliable
   mod$useOutputs <- NROW(sim$outputsDF) > 0
   mod$allReps <- dirnamesFromSet(sim$outputsDF$file, P(sim)$reps)
-  padL <- ceiling(log10(P(sim)$years[2] + 1))
-  padYearStart <- paddedFloatToChar(P(sim)$years[1], padL = padL)
-  padYearEnd <- paddedFloatToChar(P(sim)$years[2], padL = padL)
+  pad <- padYears(P(sim)$years)
 
   checkPath(file.path(P(sim)$simOutputPath, "figures", currentModule(sim)), create = TRUE)
 
