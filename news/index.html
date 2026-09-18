@@ -57,10 +57,13 @@
 <div class="section level3">
 <h3 id="documentation-1-0-2">Documentation<a class="anchor" aria-label="anchor" href="#documentation-1-0-2"></a></h3>
 <ul><li>The module <code>.Rmd</code> now has a single level-1 heading, <code># fireSense_summary Module</code>, with its sections at level 2. Every section had been a level-1 heading, which is fine when the file is knitted on its own but makes each one a separate top-level chapter in a project manual – this module contributed seven chapters to the fireSense manual, including generic “Overview”, “Usage” and “Parameters” entries (#7).</li>
+<li>
+<code>README.md</code> symlinks to <code>fireSense_summary.md</code>, as in the other fireSense modules, so the repository landing page shows the rendered module manual.</li>
 </ul></div>
 <div class="section level3">
 <h3 id="continuous-integration-1-0-2">Continuous integration<a class="anchor" aria-label="anchor" href="#continuous-integration-1-0-2"></a></h3>
 <ul><li>A pkgdown site is published for this module (#6).</li>
+<li>The module’s own rendered <code>.html</code> is no longer gitignored, so the <code>render-module-rmd</code> workflow can commit it; that step had been failing on every push to <code>development</code>.</li>
 </ul></div>
 </div>
     <div class="section level2">
