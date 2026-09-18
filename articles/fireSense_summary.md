@@ -12,9 +12,9 @@ pkgdown:
   as_is: true
 ---
 
-
-
 # fireSense_summary Module
+
+
 
 ## Overview
 
