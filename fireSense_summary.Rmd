@@ -10,6 +10,8 @@ editor_options:
   chunk_output_type: console
 ---
 
+# fireSense_summary Module
+
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE, eval = FALSE, message = FALSE, warning = FALSE, results = "hold")
 
@@ -19,8 +21,6 @@ if (!require("Require", quietly = TRUE)) {
 }
 Require("SpaDES.core", require = FALSE, upgrade = FALSE)
 ```
-
-# fireSense_summary Module
 
 ## Overview
 
