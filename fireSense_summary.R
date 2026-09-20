@@ -24,22 +24,19 @@ defineModule(sim, list(
     "PredictiveEcology/SpaDES.tools@development (>= 2.1.1.9000)"
   ),
   parameters = rbind(
-    #defineParameter("paramName", "paramClass", value, min, max, "parameter description"),
     defineParameter("climateScenario", "character", NA, NA, NA,
-                    desc = paste("name of CIMP6 climate scenarios including SSP,",
-                                 "formatted as in `ClimateNA`, using underscores as separator.",
-                                 "E.g., 'CanESM5_SSP370'.")),
+                    desc = paste("Name of the CMIP6 climate scenario including SSP, formatted as in `ClimateNA`,",
+                                 "e.g. 'CanESM5_SSP370'. Used in figure filenames (multi mode).")),
     defineParameter("mode", "character", "single", NA, NA,
-                    paste("use 'single' to run part of a simulation;",
-                          "use 'multi' to run as part of postprocessing multiple runs.")),
+                    paste("'single': run within a simulation, saving `burnMap` and `burnSummary` at `end(sim)`.",
+                          "'multi': summarize the saved outputs of several replicates in figures.")),
     defineParameter("simOutputPath", "character", outputPath(sim), NA, NA,
-                    desc = "Directory specifying the location of the simulation outputs."),
+                    desc = "Directory holding the replicate output directories, and where figures are written (multi mode)."),
     defineParameter("studyAreaName", "character", NA, NA, NA,
-                    desc = "name of study areas simulated."),
+                    desc = "Study area name; used in figure paths and filenames (multi mode)."),
     defineParameter("reps", "integer", 1L:10L, 1, NA,
-                    desc = paste("number of replicates/runs per study area and climate scenario.",
-                                 "NOTE: `mclapply` is used internally, so you should set",
-                                 "`options(mc.cores = nReps)` to run in parallel.")),
+                    desc = paste("Replicate numbers to summarize (multi mode). Files are read with `mclapply`;",
+                                 "set `options(mc.cores = )` to run in parallel.")),
     defineParameter("years", "integer", c(NA_integer_, NA_integer_), NA, NA,
                     desc = paste("Which two simulation years should be compared?",
                                  "Typically start and end years.",
@@ -47,23 +44,23 @@ defineModule(sim, list(
   ),
   inputObjects = bindrows(
     expectsInput("burnMap", "SpatRaster",
-                 desc = paste("Cumulative burn map.", "Required in single mode."),
+                 desc = "Cumulative burn map from `fireSense`. Required in single mode.",
                  sourceURL = NA),
     expectsInput("burnSummary", "data.table",
-                 paste("Fire summary table from `fireSense`.", "Required in single mode."),
+                 "Fire summary table from `fireSense`. Required in single mode.",
                  sourceURL = NA),
     expectsInput("firePolys", "list", sourceURL = NA,
-                 paste0("Optional. This module will download this if it does not exist. ",
-                        "List of sf polygon objects representing annual fire polygons.")),
+                 paste("Optional; multi mode. List of annual historical fire polygons.",
+                       "If missing, the NFDB polygons are downloaded.")),
     expectsInput("ignitionFirePoints", "SpatVector", sourceURL = NA,
-                 paste0("Optional. This module will download this if it does not exist. ",
-                        "Historical fire ignition points.")),
+                 paste("Optional; multi mode. Historical fire ignition points.",
+                       "If missing, the NFDB points are downloaded.")),
     expectsInput("outputsDF", "data.table",
-                 desc = paste("The rbindlisted outputs(sim) of all the sims being used; i.e., it ",
-                              "will contain all the files that may exist"),
+                 desc = paste("Optional; multi mode. `outputs(sim)` of all replicates, row-bound. Its `file` column",
+                              "locates the burn maps and summaries. If missing, `simOutputPath` is searched."),
                  sourceURL = NA),
     expectsInput("rasterToMatch", "SpatRaster",
-                 paste("template raster used by the simulations for summary reporting"),
+                 "Template raster of the simulations. Required in multi mode.",
                  sourceURL = NA)
   ),
   outputObjects = bindrows(
@@ -71,9 +68,18 @@ defineModule(sim, list(
   )
 ))
 
-## event types
-#   - type `init` is required for initialization
-
+#' Event dispatcher
+#'
+#' `init`: in single mode, schedules `save_single` at `end(sim)`; in multi mode,
+#' runs `InitMulti()` and makes the burn summary, cumulative burn and historic
+#' fire figures. `save_single` writes `burnMap` (`.tif`) and `burnSummary` (`.csv`)
+#' to `outputPath(sim)`.
+#'
+#' @param sim A `simList`.
+#' @param eventTime Time of the event.
+#' @param eventType `"init"` or `"save_single"`.
+#'
+#' @return The `simList`, invisibly.
 doEvent.fireSense_summary = function(sim, eventTime, eventType) {
   switch(
     eventType,
@@ -135,10 +141,15 @@ doEvent.fireSense_summary = function(sim, eventTime, eventType) {
   return(invisible(sim))
 }
 
+#' Find the replicate output files and the historical fires (multi mode)
+#'
+#' Stops if expected burn maps or burn summaries are missing from `simOutputPath`.
+#'
+#' @param sim A `simList`.
+#'
+#' @return The `simList`, invisibly, with `mod$simFiles` (`NULL` without `outputsDF`),
+#'   `mod$firePolys` and `mod$ignitionFirePoints` set, and `P(sim)$years` resolved.
 InitMulti <- function(sim) {
-  # # ! ----- EDIT BELOW ----- ! #
-
-  browser()
   ## check for necessary output files -----------------------------------------------
   ## NOTE: don't load simLists -- slow and unreliable
   mod$useOutputs <- NROW(sim$outputsDF) > 0
@@ -201,8 +212,6 @@ InitMulti <- function(sim) {
       tidyterra::bind_spat_rows() |>
       tidyterra::mutate(
         YEAR = as.integer(YEAR)
-        #MONTH = as.integer(MONTH),
-        #DAY = as.integer(DAY)
       )
   } else {
     mod$firePolys <- {
@@ -291,16 +300,14 @@ InitMulti <- function(sim) {
     }
   }
 
-  # ! ----- STOP EDITING ----- ! #
-
   return(invisible(sim))
 }
 
+#' No default inputs
+#'
+#' @param sim A `simList`.
+#'
+#' @return The `simList`, invisibly.
 .inputObjects <- function(sim) {
-  # ! ----- EDIT BELOW ----- ! #
-
-  ## nothing here
-
-  # ! ----- STOP EDITING ----- ! #
   return(invisible(sim))
 }
