@@ -256,13 +256,17 @@ InitMulti <- function(sim) {
           SIZE_HA = ADJ_HA
         )
     } else {
-      mod$firePolys <- sim$firePolys |>
+      ## NOTE: `mod$firePolys`, not `sim$firePolys`: by this point the polygons have
+      ## been bound and typed above, whereas when they were supplied as an input
+      ## `sim$firePolys` is still the *list* of annual SpatVectors, which
+      ## tidyterra::mutate() cannot take.
+      mod$firePolys <- mod$firePolys |>
         tidyterra::mutate(
           SIZE_HA = POLY_HA
         )
     }
   }
-  
+
   ## TODO: use an updated/working prepInputs version (fireSenseUtils::getFirePoints_NFDB_V2?)
   if (exists("ignitionFirePoints", envir(sim))) {
     mod$ignitionFirePoints <- sim$ignitionFirePoints
