@@ -64,10 +64,17 @@ test_that("the burn map filename follows end(sim), not start(sim)", {
   expect_false(file.exists(file.path(out, "burnMap_year1.tif")))
 })
 
-## NOT TESTED: the unknown-event-type branch. `noEventWarning()` in SpaDES.core
-## only *returns* a message string, and `switch()`'s default value is discarded by
-## `doEvent`, so an unknown event type is silently a no-op. Asserting that would
-## enshrine it; it is upstream behaviour, not this module's.
+test_that("an unknown event type warns", {
+  ## `noEventWarning()` in SpaDES.core only *returns* the message string, so the
+  ## module has to wrap it in warning(); bare, `switch()`'s default value was
+  ## discarded and an unknown event type was silently a no-op.
+  s <- makeSingleSim()
+  s <- SpaDES.core::scheduleEvent(s, SpaDES.core::start(s), "fireSense_summary", "notAnEvent")
+  expect_warning(
+    SpaDES.core::spades(s, debug = FALSE),
+    "Undefined event type: 'notAnEvent' in module 'fireSense_summary'"
+  )
+})
 
 test_that("single-mode init schedules exactly one save_single at end(sim)", {
   ## The two modes must not overlap: a single-mode run schedules exactly one

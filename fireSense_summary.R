@@ -136,7 +136,7 @@ doEvent.fireSense_summary = function(sim, eventTime, eventType) {
       data.table::fwrite(sim$burnSummary, file = f_burnSummary)
       sim <- registerOutputs(f_burnSummary, sim)
     },
-    noEventWarning(sim)
+    warning(noEventWarning(sim))
   )
   return(invisible(sim))
 }
