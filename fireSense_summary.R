@@ -34,9 +34,8 @@ defineModule(sim, list(
                           "use 'multi' to run as part of postprocessing multiple runs.")),
     defineParameter("simOutputPath", "character", outputPath(sim), NA, NA,
                     desc = "Directory specifying the location of the simulation outputs."),
-    defineParameter("studyAreaName", "character", NA, NA, NA,
-                    desc = paste("name of study areas simulated.",
-                                 "Defaults to the simulation's `.studyAreaName` global, if one is set.")),
+    defineParameter(".studyAreaName", "character", NA, NA, NA,
+                    desc = "Human-readable name of the study area simulated; usually set in `.globals`."),
     defineParameter("reps", "integer", 1L:10L, 1, NA,
                     desc = paste("number of replicates/runs per study area and climate scenario.",
                                  "NOTE: `mclapply` is used internally, so you should set",
@@ -79,8 +78,6 @@ doEvent.fireSense_summary = function(sim, eventTime, eventType) {
   switch(
     eventType,
     init = {
-      if (all(is.na(P(sim)$studyAreaName)) && !is.null(globals(sim)$.studyAreaName))
-        P(sim)$studyAreaName <- globals(sim)$.studyAreaName
       if (P(sim)$mode == "single") {
         sim <- scheduleEvent(sim, end(sim), "fireSense_summary", "save_single", .last())
       } else if (P(sim)$mode == "multi") {
@@ -90,7 +87,7 @@ doEvent.fireSense_summary = function(sim, eventTime, eventType) {
 
         f_burnSummary_plot <- fireSenseUtils::plotBurnSummary(
           climateScenario = P(sim)$climateScenario,
-          studyAreaName = P(sim)$studyAreaName,
+          studyAreaName = P(sim)$.studyAreaName,
           outputDir = P(sim)$simOutputPath,
           Nreps = max(P(sim)$reps),
           years = P(sim)$years,
@@ -101,7 +98,7 @@ doEvent.fireSense_summary = function(sim, eventTime, eventType) {
 
         f_cumulBurn_plot <- fireSenseUtils::plotCumulativeBurns(
           climateScenario = P(sim)$climateScenario,
-          studyAreaName = P(sim)$studyAreaName,
+          studyAreaName = P(sim)$.studyAreaName,
           outputDir = P(sim)$simOutputPath,
           Nreps = max(P(sim)$reps),
           years = P(sim)$years,
@@ -112,7 +109,7 @@ doEvent.fireSense_summary = function(sim, eventTime, eventType) {
 
         f_historic_plot <- fireSenseUtils::plotHistoricFires(
           climateScenario = as.character(P(sim)$climateScenario),
-          studyAreaName = P(sim)$studyAreaName,
+          studyAreaName = P(sim)$.studyAreaName,
           outputDir = P(sim)$simOutputPath,
           pixelSize = unique(terra::res(sim$rasterToMatch)),
           firePolys = mod$firePolys,
