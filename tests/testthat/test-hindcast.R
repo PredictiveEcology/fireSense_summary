@@ -98,7 +98,7 @@ test_that("hindcast multi mode pools the parameter-set folders into three figure
   m <- SpaDES.core::simInit(
     times = list(start = 2000, end = 2000.0095),
     params = list(fireSense_summary = list(mode = "multi", hindcastYear = 2000L, reps = 1:2,
-                                           simOutputPath = root, studyAreaName = "toy", .plots = "png")),
+                                           simOutputPath = root, .studyAreaName = "toy", .plots = "png")),
     modules = "fireSense_summary", objects = list(),
     paths = list(modulePath = modulePath, outputPath = root, cachePath = file.path(root, "cache"),
                  inputPath = file.path(root, "in")))

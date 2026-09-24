@@ -38,8 +38,8 @@ test_that("parameters are the expected names", {
   md <- SpaDES.core::moduleMetadata(module = moduleName, path = modulePath)
   expect_identical(
     sort(md$parameters$paramName),
-    sort(c("climateScenario", "escapeSizeHa", "hindcastInterval", "hindcastYear", "mode", "reps",
-           "simOutputPath", "studyAreaName", "years"))
+    sort(c(".studyAreaName", "climateScenario", "escapeSizeHa", "hindcastInterval", "hindcastYear", "mode",
+           "reps", "simOutputPath", "years"))
   )
 })
 
@@ -57,9 +57,9 @@ test_that("parameter classes and defaults are as declared", {
   p <- md$parameters[order(md$parameters$paramName), ]
   expect_identical(
     stats::setNames(unlist(p$paramClass), p$paramName),
-    c(climateScenario = "character", escapeSizeHa = "numeric", hindcastInterval = "numeric",
+    c(.studyAreaName = "character", climateScenario = "character", escapeSizeHa = "numeric", hindcastInterval = "numeric",
       hindcastYear = "integer", mode = "character", reps = "integer",
-      simOutputPath = "character", studyAreaName = "character", years = "integer")
+      simOutputPath = "character", years = "integer")
   )
   dflt <- stats::setNames(p$default, p$paramName)
   expect_identical(dflt$mode, "single")
@@ -71,7 +71,7 @@ test_that("parameter classes and defaults are as declared", {
   ## no hindcast unless asked, and whole-year steps between rep-years if it is
   expect_true(is.na(dflt$hindcastYear))
   expect_identical(dflt$hindcastInterval, 1)
-  expect_true(is.na(dflt$studyAreaName))
+  expect_true(is.na(dflt$.studyAreaName))
 })
 
 test_that("the module declares the functions the tests reach for", {
