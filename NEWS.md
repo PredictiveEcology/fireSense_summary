@@ -1,3 +1,11 @@
+# fireSense_summary 1.0.1.9001
+
+- The parameter `studyAreaName` is renamed `.studyAreaName`, the name every other fireSense and Biomass module
+  uses for it. A project passing `studyAreaName` to this module must rename it. If it is `NA` (the default), a
+  hash of `rasterToMatch` is used, as other modules use a hash of `studyArea`.
+- `years` (already `NA`) defaults to the simulation's start and end, so a project need not repeat them here.
+- Requires SpaDES.core >= 3.2.1.9001, for `resolveSimYears()`.
+
 # fireSense_summary 1.0.1
 
 First release from `development` since `main` was last updated (2024-04-19). Full history: https://github.com/PredictiveEcology/fireSense_summary/compare/4e1ac80...v1.0.1

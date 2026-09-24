@@ -32,7 +32,7 @@ test_that("parameters are the expected names", {
   md <- SpaDES.core::moduleMetadata(module = moduleName, path = modulePath)
   expect_identical(
     sort(md$parameters$paramName),
-    sort(c("climateScenario", "mode", "reps", "simOutputPath", "studyAreaName",
+    sort(c(".studyAreaName", "climateScenario", "mode", "reps", "simOutputPath",
            "years"))
   )
 })

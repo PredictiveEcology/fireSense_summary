@@ -37,7 +37,7 @@ Provide a summary of user-visible parameters.
 |:----------------|:----------|:------------|:---|:---|:----------------------------------------------------------------------------------------------------------------------------------|
 |climateScenarios |character  |NA           |NA  |NA  |names of CIMP6 climate scenarios including SSP, formatted as in ClimateNA, using underscores as separator. E.g., 'CanESM5_SSP370'. |
 |simOutputPath    |character  |outputPa.... |NA  |NA  |Directory specifying the location of the simulation outputs.                                                                       |
-|studyAreaNames   |character  |NA           |NA  |NA  |names of study areas simulated.                                                                                                    |
+|.studyAreaName   |character  |NA           |NA  |NA  |Human-readable name for the study area used. If `NA`, a hash of `rasterToMatch` will be used.                                                         |
 |reps             |integer    |1, 2, 3,.... |1   |NA  |number of replicates/runs per study area and climate scenario.                                                                     |
 |upload           |logical    |FALSE        |NA  |NA  |if TRUE, uses the `googledrive` package to upload figures.                                                                         |
 |years            |integer    |2011, 2100   |NA  |NA  |Which two simulation years should be compared? Typically start and end years.                                                      |
