@@ -9,12 +9,12 @@ defineModule(sim, list(
     person("Ian MS", "Eddy", email = "ian.eddy@nrcan-rncan.gc.ca", role = "aut")
   ),
   childModules = character(0),
-  version = list(fireSense_summary = "1.0.2"),
+  version = list(fireSense_summary = "1.0.3"),
   timeframe = as.POSIXlt(c(NA, NA)),
   timeunit = "year",
   citation = list("citation.bib"),
   documentation = list("README.md", "fireSense_summary.Rmd"), ## same file
-  loadOrder = list(after = c("fireSense")),
+  loadOrder = list(after = c("fireSense_burn")),
   reqdPkgs = list(
     "assertthat", "cowplot", "data.table", "fs", "ggplot2", "googledrive",
     "purrr", "qs2", "RColorBrewer", "terra", "tidyterra",
@@ -49,7 +49,7 @@ defineModule(sim, list(
                  desc = paste("Cumulative burn map.", "Required in single mode."),
                  sourceURL = NA),
     expectsInput("burnSummary", "data.table",
-                 paste("Fire summary table from `fireSense`.", "Required in single mode."),
+                 paste("Fire summary table from `fireSense_burn`.", "Required in single mode."),
                  sourceURL = NA),
     expectsInput("rasterToMatch", "SpatRaster",
                  paste("template raster used by the simulations for summary reporting"),
