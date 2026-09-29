@@ -1,3 +1,7 @@
+# fireSense_summary 1.0.3
+
+- `loadOrder` now runs after `fireSense_burn` (the burn module was renamed from `fireSense`); with the old name the ordering was silently ignored.
+
 # fireSense_summary 1.0.2
 
 Documentation and CI only; no change to the module's behaviour.

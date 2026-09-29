@@ -66,7 +66,7 @@ Description of the module inputs.
 |objectName    |objectClass |desc                                                          |sourceURL |
 |:-------------|:-----------|:-------------------------------------------------------------|:---------|
 |burnMap       |SpatRaster  |Cumulative burn map. Required in single mode.                 |NA        |
-|burnSummary   |data.table  |Fire summary table from `fireSense`. Required in single mode. |NA        |
+|burnSummary   |data.table  |Fire summary table from `fireSense_burn`. Required in single mode. |NA        |
 |rasterToMatch |SpatRaster  |template raster used by the simulations for summary reporting |NA        |
 
 ### Output data
