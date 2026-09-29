@@ -1,7 +1,7 @@
 ---
 title: "fireSense_summary Manual"
 author: "Alex Chubaty"
-date: "18 September 2026"
+date: "29 September 2026"
 output:
   html_document:
     df_print: paged
@@ -65,11 +65,11 @@ Write what is saved.
 Description of the module inputs.
 
 
-|objectName    |objectClass |desc                                                          |sourceURL |
-|:-------------|:-----------|:-------------------------------------------------------------|:---------|
-|burnMap       |SpatRaster  |Cumulative burn map. Required in single mode.                 |NA        |
-|burnSummary   |data.table  |Fire summary table from `fireSense`. Required in single mode. |NA        |
-|rasterToMatch |SpatRaster  |template raster used by the simulations for summary reporting |NA        |
+|objectName    |objectClass |desc                                                               |sourceURL |
+|:-------------|:-----------|:------------------------------------------------------------------|:---------|
+|burnMap       |SpatRaster  |Cumulative burn map. Required in single mode.                      |NA        |
+|burnSummary   |data.table  |Fire summary table from `fireSense_burn`. Required in single mode. |NA        |
+|rasterToMatch |SpatRaster  |template raster used by the simulations for summary reporting      |NA        |
 
 ### Output data
 

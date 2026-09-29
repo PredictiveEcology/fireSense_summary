@@ -33,7 +33,7 @@
       </button>
       <span class="navbar-brand">
         <a class="navbar-link" href="index.html">fireSense_summary</a>
-        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">1.0.2</span>
+        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">1.0.3</span>
       </span>
     </div>
 
@@ -70,39 +70,41 @@
 
       </header><div class="row">
   <div class="contents col-md-9">
-
 <div class="section level1">
-<div class="page-header"><h1 id="overview">Overview<a class="anchor" aria-label="anchor" href="#overview"></a>
+<div class="page-header"><h1 id="firesense_summary-module">fireSense_summary Module<a class="anchor" aria-label="anchor" href="#firesense_summary-module"></a>
 </h1></div>
+<div class="section level2">
+<h2 id="overview">Overview<a class="anchor" aria-label="anchor" href="#overview"></a>
+</h2>
 <p>Summarizes the results of multiple <code>fireSense</code> simulations, across multiple study areas, climate scenarios, and replicates.</p>
 </div>
-<div class="section level1">
-<h1 id="usage">Usage<a class="anchor" aria-label="anchor" href="#usage"></a>
-</h1>
-<p>Intended to be used for post-simulation processing of multiple LandR Biomass simulations, following a <code>LandR-fs</code> project structure and workflow described and templated in the <a href="https://github.com/PredictiveEcology/SpaDES.project" class="external-link"><code>SpaDES.project</code></a> package.</p>
 <div class="section level2">
-<h2 id="plotting-and-saving">Plotting and saving<a class="anchor" aria-label="anchor" href="#plotting-and-saving"></a>
+<h2 id="usage">Usage<a class="anchor" aria-label="anchor" href="#usage"></a>
 </h2>
+<p>Intended to be used for post-simulation processing of multiple LandR Biomass simulations, following a <code>LandR-fs</code> project structure and workflow described and templated in the <a href="https://github.com/PredictiveEcology/SpaDES.project" class="external-link"><code>SpaDES.project</code></a> package.</p>
+<div class="section level3">
+<h3 id="plotting-and-saving">Plotting and saving<a class="anchor" aria-label="anchor" href="#plotting-and-saving"></a>
+</h3>
 <p>Several figures are produced, as <code>.png</code> files, and summary rasters are written to disk.</p>
 </div>
-<div class="section level2">
-<h2 id="uploading">Uploading<a class="anchor" aria-label="anchor" href="#uploading"></a>
-</h2>
+<div class="section level3">
+<h3 id="uploading">Uploading<a class="anchor" aria-label="anchor" href="#uploading"></a>
+</h3>
 <p>Figures can optionally be uploaded to Google Drive.</p>
 </div>
 </div>
-<div class="section level1">
-<h1 id="parameters">Parameters<a class="anchor" aria-label="anchor" href="#parameters"></a>
-</h1>
+<div class="section level2">
+<h2 id="parameters">Parameters<a class="anchor" aria-label="anchor" href="#parameters"></a>
+</h2>
 <p>Provide a summary of user-visible parameters.</p>
 <table class="table">
 <colgroup>
-<col width="9%">
-<col width="6%">
 <col width="7%">
-<col width="2%">
-<col width="2%">
-<col width="72%">
+<col width="5%">
+<col width="6%">
+<col width="1%">
+<col width="1%">
+<col width="77%">
 </colgroup>
 <thead><tr>
 <th align="left">paramName</th>
@@ -114,28 +116,36 @@
 </tr></thead>
 <tbody>
 <tr>
-<td align="left">climateScenarios</td>
+<td align="left">climateScenario</td>
 <td align="left">character</td>
 <td align="left">NA</td>
 <td align="left">NA</td>
 <td align="left">NA</td>
-<td align="left">names of CIMP6 climate scenarios including SSP, formatted as in ClimateNA, using underscores as separator. E.g., ‘CanESM5_SSP370’.</td>
+<td align="left">name of CIMP6 climate scenarios including SSP, formatted as in <code>ClimateNA</code>, using underscores as separator. E.g., ‘CanESM5_SSP370’.</td>
+</tr>
+<tr>
+<td align="left">mode</td>
+<td align="left">character</td>
+<td align="left">single</td>
+<td align="left">NA</td>
+<td align="left">NA</td>
+<td align="left">use ‘single’ to run part of a simulation; use ‘multi’ to run as part of postprocessing multiple runs.</td>
 </tr>
 <tr>
 <td align="left">simOutputPath</td>
 <td align="left">character</td>
-<td align="left">outputPa….</td>
+<td align="left">/tmp/Rtm….</td>
 <td align="left">NA</td>
 <td align="left">NA</td>
 <td align="left">Directory specifying the location of the simulation outputs.</td>
 </tr>
 <tr>
-<td align="left">studyAreaNames</td>
+<td align="left">studyAreaName</td>
 <td align="left">character</td>
 <td align="left">NA</td>
 <td align="left">NA</td>
 <td align="left">NA</td>
-<td align="left">names of study areas simulated.</td>
+<td align="left">name of study areas simulated.</td>
 </tr>
 <tr>
 <td align="left">reps</td>
@@ -143,15 +153,7 @@
 <td align="left">1, 2, 3,….</td>
 <td align="left">1</td>
 <td align="left">NA</td>
-<td align="left">number of replicates/runs per study area and climate scenario.</td>
-</tr>
-<tr>
-<td align="left">upload</td>
-<td align="left">logical</td>
-<td align="left">FALSE</td>
-<td align="left">NA</td>
-<td align="left">NA</td>
-<td align="left">if TRUE, uses the <code>googledrive</code> package to upload figures.</td>
+<td align="left">number of replicates/runs per study area and climate scenario. NOTE: <code>mclapply</code> is used internally, so you should set <code>options(mc.cores = nReps)</code> to run in parallel.</td>
 </tr>
 <tr>
 <td align="left">years</td>
@@ -164,34 +166,34 @@
 </tbody>
 </table>
 </div>
-<div class="section level1">
-<h1 id="events">Events<a class="anchor" aria-label="anchor" href="#events"></a>
-</h1>
-<p>Describe what happens for each event type.</p>
 <div class="section level2">
-<h2 id="plotting">Plotting<a class="anchor" aria-label="anchor" href="#plotting"></a>
+<h2 id="events">Events<a class="anchor" aria-label="anchor" href="#events"></a>
 </h2>
+<p>Describe what happens for each event type.</p>
+<div class="section level3">
+<h3 id="plotting">Plotting<a class="anchor" aria-label="anchor" href="#plotting"></a>
+</h3>
 <p>Write what is plotted.</p>
 </div>
-<div class="section level2">
-<h2 id="saving">Saving<a class="anchor" aria-label="anchor" href="#saving"></a>
-</h2>
+<div class="section level3">
+<h3 id="saving">Saving<a class="anchor" aria-label="anchor" href="#saving"></a>
+</h3>
 <p>Write what is saved.</p>
 </div>
 </div>
-<div class="section level1">
-<h1 id="data-dependencies">Data dependencies<a class="anchor" aria-label="anchor" href="#data-dependencies"></a>
-</h1>
 <div class="section level2">
-<h2 id="input-data">Input data<a class="anchor" aria-label="anchor" href="#input-data"></a>
+<h2 id="data-dependencies">Data dependencies<a class="anchor" aria-label="anchor" href="#data-dependencies"></a>
 </h2>
+<div class="section level3">
+<h3 id="input-data">Input data<a class="anchor" aria-label="anchor" href="#input-data"></a>
+</h3>
 <p>Description of the module inputs.</p>
 <table class="table">
 <colgroup>
+<col width="14%">
+<col width="12%">
+<col width="63%">
 <col width="10%">
-<col width="9%">
-<col width="72%">
-<col width="7%">
 </colgroup>
 <thead><tr>
 <th align="left">objectName</th>
@@ -201,23 +203,29 @@
 </tr></thead>
 <tbody>
 <tr>
-<td align="left">rasterToMatch</td>
-<td align="left">RasterLayer</td>
-<td align="left">DESCRIPTION NEEDED</td>
+<td align="left">burnMap</td>
+<td align="left">SpatRaster</td>
+<td align="left">Cumulative burn map. Required in single mode.</td>
 <td align="left">NA</td>
 </tr>
 <tr>
-<td align="left">uploadTo</td>
-<td align="left">character</td>
-<td align="left">if <code>upload = TRUE</code>, a named list of Google Drive folder ids, corresponding to <code>studyAreaNames</code>.</td>
+<td align="left">burnSummary</td>
+<td align="left">data.table</td>
+<td align="left">Fire summary table from <code>fireSense_burn</code>. Required in single mode.</td>
+<td align="left">NA</td>
+</tr>
+<tr>
+<td align="left">rasterToMatch</td>
+<td align="left">SpatRaster</td>
+<td align="left">template raster used by the simulations for summary reporting</td>
 <td align="left">NA</td>
 </tr>
 </tbody>
 </table>
 </div>
-<div class="section level2">
-<h2 id="output-data">Output data<a class="anchor" aria-label="anchor" href="#output-data"></a>
-</h2>
+<div class="section level3">
+<h3 id="output-data">Output data<a class="anchor" aria-label="anchor" href="#output-data"></a>
+</h3>
 <p>Description of the module outputs.</p>
 <table class="table">
 <thead><tr>
@@ -233,12 +241,12 @@
 </table>
 </div>
 </div>
-<div class="section level1">
-<h1 id="links-to-other-modules">Links to other modules<a class="anchor" aria-label="anchor" href="#links-to-other-modules"></a>
-</h1>
+<div class="section level2">
+<h2 id="links-to-other-modules">Links to other modules<a class="anchor" aria-label="anchor" href="#links-to-other-modules"></a>
+</h2>
 <p>Originally developed for <em>post hoc</em> use with the <code>fireSense</code> suite of wildfire modules.</p>
 </div>
-
+</div>
   </div>
 
   <div class="col-md-3 hidden-xs hidden-sm" id="pkgdown-sidebar">
