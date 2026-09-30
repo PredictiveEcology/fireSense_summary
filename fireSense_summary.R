@@ -9,14 +9,14 @@ defineModule(sim, list(
     person("Ian MS", "Eddy", email = "ian.eddy@nrcan-rncan.gc.ca", role = "aut")
   ),
   childModules = character(0),
-  version = list(fireSense_summary = "1.0.1.9002"),
+  version = list(fireSense_summary = "1.0.1.9003"),
   timeframe = as.POSIXlt(c(NA, NA)),
   timeunit = "year",
   citation = list("citation.bib"),
   documentation = list("README.md", "fireSense_summary.Rmd"), ## same file
   loadOrder = list(after = c("fireSense_burn")),
   reqdPkgs = list(
-    "assertthat", "cowplot", "data.table", "fs", "ggplot2", "googledrive",
+    "archive", "assertthat", "cowplot", "data.table", "fs", "ggplot2", "googledrive",
     "purrr", "qs2", "RColorBrewer", "reproducible", "terra", "tidyterra",
     "raster", "rasterVis", ## TODO: remove these once fireSenseUtils::plotCumulativeBurns switched to ggplot2/tidyterra
     "PredictiveEcology/fireSenseUtils@development (>= 0.1.2.9000)",
