@@ -1,3 +1,7 @@
+# fireSense_summary 1.0.4
+
+- reqdPkgs now lists `archive`, which the module calls with `::` but did not list. Version 1.0.4.
+
 # fireSense_summary 1.0.3
 
 - `loadOrder` now runs after `fireSense_burn` (the burn module was renamed from `fireSense`); with the old name the ordering was silently ignored.
