@@ -1,7 +1,7 @@
 ---
 title: "fireSense_summary Manual"
 author: "Alex Chubaty"
-date: "29 September 2026"
+date: "30 September 2026"
 output:
   html_document:
     df_print: paged
