@@ -50,7 +50,7 @@
   </a>
   <ul class="dropdown-menu" role="menu">
 <li>
-      <a href="articles/fireSense_summary.html">fireSense_summary Manual</a>
+      <a href="articles/fireSense_summary.html">fireSense_summary</a>
     </li>
   </ul>
 </li>
@@ -70,33 +70,45 @@
 
       </header><div class="row">
   <div class="contents col-md-9">
+
 <div class="section level1">
-<div class="page-header"><h1 id="firesense_summary-module">fireSense_summary Module<a class="anchor" aria-label="anchor" href="#firesense_summary-module"></a>
+<div class="page-header"><h1 id="overview">Overview<a class="anchor" aria-label="anchor" href="#overview"></a>
 </h1></div>
-<div class="section level2">
-<h2 id="overview">Overview<a class="anchor" aria-label="anchor" href="#overview"></a>
-</h2>
-<p>Summarizes the results of multiple <code>fireSense</code> simulations, across multiple study areas, climate scenarios, and replicates.</p>
+<p>Saves and summarizes <code>fireSense</code> burn results. It has two modes (parameter <code>mode</code>):</p>
+<ul>
+<li>
+<code>"single"</code> (default): run inside a simulation, after <code>fireSense_burn</code>. At <code>end(sim)</code> it writes <code>burnMap_year&lt;end&gt;.tif</code> and <code>fireSense_burnSummary.csv</code> to <code>outputPath(sim)</code>.</li>
+<li>
+<code>"multi"</code>: run on its own after several replicates have finished. It finds each replicate’s burn map and burn summary and makes figures with <code><a href="https://rdrr.io/pkg/fireSenseUtils/man/plotBurnSummary.html" class="external-link">fireSenseUtils::plotBurnSummary()</a></code>, <code>plotCumulativeBurns()</code> and <code>plotHistoricFires()</code>.</li>
+</ul>
 </div>
-<div class="section level2">
-<h2 id="usage">Usage<a class="anchor" aria-label="anchor" href="#usage"></a>
-</h2>
-<p>Intended to be used for post-simulation processing of multiple LandR Biomass simulations, following a <code>LandR-fs</code> project structure and workflow described and templated in the <a href="https://github.com/PredictiveEcology/SpaDES.project" class="external-link"><code>SpaDES.project</code></a> package.</p>
-<div class="section level3">
-<h3 id="plotting-and-saving">Plotting and saving<a class="anchor" aria-label="anchor" href="#plotting-and-saving"></a>
-</h3>
-<p>Several figures are produced, as <code>.png</code> files, and summary rasters are written to disk.</p>
+<div class="section level1">
+<h1 id="usage">Usage<a class="anchor" aria-label="anchor" href="#usage"></a>
+</h1>
+<p>Single mode needs no setup beyond adding the module to a simulation that includes <code>fireSense</code>.</p>
+<p>Multi mode:</p>
+<div class="sourceCode" id="cb1"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://spades-core.predictiveecology.org/" class="external-link">SpaDES.core</a></span><span class="op">)</span></span>
+<span></span>
+<span><span class="va">mySim</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://spades-core.predictiveecology.org/reference/simInit.html" class="external-link">simInit</a></span><span class="op">(</span></span>
+<span>  times <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>start <span class="op">=</span> <span class="fl">2011</span>, end <span class="op">=</span> <span class="fl">2100</span><span class="op">)</span>,</span>
+<span>  modules <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span><span class="st">"fireSense_summary"</span><span class="op">)</span>,</span>
+<span>  params <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>fireSense_summary <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span></span>
+<span>    mode <span class="op">=</span> <span class="st">"multi"</span>,</span>
+<span>    simOutputPath <span class="op">=</span> <span class="st">"outputs/myStudyArea"</span>, <span class="co">## holds rep01/, rep02/, ...</span></span>
+<span>    studyAreaName <span class="op">=</span> <span class="st">"myStudyArea"</span>,</span>
+<span>    climateScenario <span class="op">=</span> <span class="st">"CanESM5_SSP370"</span>,</span>
+<span>    reps <span class="op">=</span> <span class="fl">1L</span><span class="op">:</span><span class="fl">10L</span></span>
+<span>  <span class="op">)</span><span class="op">)</span>,</span>
+<span>  objects <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>rasterToMatch <span class="op">=</span> <span class="va">rasterToMatch</span><span class="op">)</span>,</span>
+<span>  paths <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>modulePath <span class="op">=</span> <span class="st">".."</span><span class="op">)</span></span>
+<span><span class="op">)</span></span>
+<span><span class="fu"><a href="https://spades-core.predictiveecology.org/reference/spades.html" class="external-link">spades</a></span><span class="op">(</span><span class="va">mySim</span><span class="op">)</span></span></code></pre></div>
+<p>The replicate files are found either from <code>outputsDF</code> (the row-bound <code>outputs(sim)</code> of the replicates) or, without it, by searching <code>simOutputPath/rep*/</code>; in that case the module stops if a burn map or burn summary is missing. Historical fires for the comparison figure come from <code>firePolys</code> and <code>ignitionFirePoints</code>, or are downloaded from the Canadian National Fire Database.</p>
 </div>
-<div class="section level3">
-<h3 id="uploading">Uploading<a class="anchor" aria-label="anchor" href="#uploading"></a>
-</h3>
-<p>Figures can optionally be uploaded to Google Drive.</p>
-</div>
-</div>
-<div class="section level2">
-<h2 id="parameters">Parameters<a class="anchor" aria-label="anchor" href="#parameters"></a>
-</h2>
-<p>Provide a summary of user-visible parameters.</p>
+<div class="section level1">
+<h1 id="parameters">Parameters<a class="anchor" aria-label="anchor" href="#parameters"></a>
+</h1>
 <table class="table">
 <colgroup>
 <col width="7%">
@@ -104,7 +116,7 @@
 <col width="6%">
 <col width="1%">
 <col width="1%">
-<col width="77%">
+<col width="76%">
 </colgroup>
 <thead><tr>
 <th align="left">paramName</th>
@@ -121,7 +133,7 @@
 <td align="left">NA</td>
 <td align="left">NA</td>
 <td align="left">NA</td>
-<td align="left">name of CIMP6 climate scenarios including SSP, formatted as in <code>ClimateNA</code>, using underscores as separator. E.g., ‘CanESM5_SSP370’.</td>
+<td align="left">Name of the CMIP6 climate scenario including SSP, formatted as in <code>ClimateNA</code>, e.g. ‘CanESM5_SSP370’. Used in figure filenames (multi mode).</td>
 </tr>
 <tr>
 <td align="left">mode</td>
@@ -129,15 +141,15 @@
 <td align="left">single</td>
 <td align="left">NA</td>
 <td align="left">NA</td>
-<td align="left">use ‘single’ to run part of a simulation; use ‘multi’ to run as part of postprocessing multiple runs.</td>
+<td align="left">‘single’: run within a simulation, saving <code>burnMap</code> and <code>burnSummary</code> at <code>end(sim)</code>. ‘multi’: summarize the saved outputs of several replicates in figures.</td>
 </tr>
 <tr>
 <td align="left">simOutputPath</td>
 <td align="left">character</td>
-<td align="left">/tmp/Rtm….</td>
+<td align="left">outputPa….</td>
 <td align="left">NA</td>
 <td align="left">NA</td>
-<td align="left">Directory specifying the location of the simulation outputs.</td>
+<td align="left">Directory holding the replicate output directories, and where figures are written (multi mode).</td>
 </tr>
 <tr>
 <td align="left">studyAreaName</td>
@@ -145,7 +157,7 @@
 <td align="left">NA</td>
 <td align="left">NA</td>
 <td align="left">NA</td>
-<td align="left">name of study areas simulated.</td>
+<td align="left">Study area name; used in figure paths and filenames (multi mode).</td>
 </tr>
 <tr>
 <td align="left">reps</td>
@@ -153,47 +165,51 @@
 <td align="left">1, 2, 3,….</td>
 <td align="left">1</td>
 <td align="left">NA</td>
-<td align="left">number of replicates/runs per study area and climate scenario. NOTE: <code>mclapply</code> is used internally, so you should set <code>options(mc.cores = nReps)</code> to run in parallel.</td>
+<td align="left">Replicate numbers to summarize (multi mode). Files are read with <code>mclapply</code>; set <code>options(mc.cores = )</code> to run in parallel.</td>
 </tr>
 <tr>
 <td align="left">years</td>
 <td align="left">integer</td>
-<td align="left">2011, 2100</td>
+<td align="left">NA, NA</td>
 <td align="left">NA</td>
 <td align="left">NA</td>
-<td align="left">Which two simulation years should be compared? Typically start and end years.</td>
+<td align="left">Which two simulation years should be compared? Typically start and end years. Defaults to the simulation’s own start and end times.</td>
 </tr>
 </tbody>
 </table>
 </div>
+<div class="section level1">
+<h1 id="events">Events<a class="anchor" aria-label="anchor" href="#events"></a>
+</h1>
+<ul>
+<li>
+<code>init</code>: in single mode, schedules <code>save_single</code> at <code>end(sim)</code>. In multi mode, does all the work: locates the files and makes the figures.</li>
+<li>
+<code>save_single</code>: writes the burn map and burn summary (single mode only).</li>
+</ul>
 <div class="section level2">
-<h2 id="events">Events<a class="anchor" aria-label="anchor" href="#events"></a>
+<h2 id="plotting">Plotting<a class="anchor" aria-label="anchor" href="#plotting"></a>
 </h2>
-<p>Describe what happens for each event type.</p>
-<div class="section level3">
-<h3 id="plotting">Plotting<a class="anchor" aria-label="anchor" href="#plotting"></a>
-</h3>
-<p>Write what is plotted.</p>
-</div>
-<div class="section level3">
-<h3 id="saving">Saving<a class="anchor" aria-label="anchor" href="#saving"></a>
-</h3>
-<p>Write what is saved.</p>
-</div>
+<p>Multi mode only. Figures are <code>.png</code> files under <code>simOutputPath</code>, registered in <code>outputs(sim)</code>: burn summaries across replicates, cumulative burns, and simulated versus historical ignitions, escapes and area burned.</p>
 </div>
 <div class="section level2">
-<h2 id="data-dependencies">Data dependencies<a class="anchor" aria-label="anchor" href="#data-dependencies"></a>
+<h2 id="saving">Saving<a class="anchor" aria-label="anchor" href="#saving"></a>
 </h2>
-<div class="section level3">
-<h3 id="input-data">Input data<a class="anchor" aria-label="anchor" href="#input-data"></a>
-</h3>
-<p>Description of the module inputs.</p>
+<p>Single mode only; see <code>save_single</code>.</p>
+</div>
+</div>
+<div class="section level1">
+<h1 id="data-dependencies">Data dependencies<a class="anchor" aria-label="anchor" href="#data-dependencies"></a>
+</h1>
+<div class="section level2">
+<h2 id="input-data">Input data<a class="anchor" aria-label="anchor" href="#input-data"></a>
+</h2>
 <table class="table">
 <colgroup>
-<col width="13%">
-<col width="11%">
-<col width="65%">
 <col width="9%">
+<col width="5%">
+<col width="79%">
+<col width="4%">
 </colgroup>
 <thead><tr>
 <th align="left">objectName</th>
@@ -205,7 +221,7 @@
 <tr>
 <td align="left">burnMap</td>
 <td align="left">SpatRaster</td>
-<td align="left">Cumulative burn map. Required in single mode.</td>
+<td align="left">Cumulative burn map from <code>fireSense_burn</code>. Required in single mode.</td>
 <td align="left">NA</td>
 </tr>
 <tr>
@@ -215,18 +231,36 @@
 <td align="left">NA</td>
 </tr>
 <tr>
+<td align="left">firePolys</td>
+<td align="left">list</td>
+<td align="left">Optional; multi mode. List of annual historical fire polygons. If missing, the NFDB polygons are downloaded.</td>
+<td align="left">NA</td>
+</tr>
+<tr>
+<td align="left">ignitionFirePoints</td>
+<td align="left">SpatVector</td>
+<td align="left">Optional; multi mode. Historical fire ignition points. If missing, the NFDB points are downloaded.</td>
+<td align="left">NA</td>
+</tr>
+<tr>
+<td align="left">outputsDF</td>
+<td align="left">data.table</td>
+<td align="left">Optional; multi mode. <code>outputs(sim)</code> of all replicates, row-bound. Its <code>file</code> column locates the burn maps and summaries. If missing, <code>simOutputPath</code> is searched.</td>
+<td align="left">NA</td>
+</tr>
+<tr>
 <td align="left">rasterToMatch</td>
 <td align="left">SpatRaster</td>
-<td align="left">template raster used by the simulations for summary reporting</td>
+<td align="left">Template raster of the simulations. Required in multi mode.</td>
 <td align="left">NA</td>
 </tr>
 </tbody>
 </table>
 </div>
-<div class="section level3">
-<h3 id="output-data">Output data<a class="anchor" aria-label="anchor" href="#output-data"></a>
-</h3>
-<p>Description of the module outputs.</p>
+<div class="section level2">
+<h2 id="output-data">Output data<a class="anchor" aria-label="anchor" href="#output-data"></a>
+</h2>
+<p>None; results are files on disk.</p>
 <table class="table">
 <thead><tr>
 <th align="left">objectName</th>
@@ -241,12 +275,12 @@
 </table>
 </div>
 </div>
-<div class="section level2">
-<h2 id="links-to-other-modules">Links to other modules<a class="anchor" aria-label="anchor" href="#links-to-other-modules"></a>
-</h2>
-<p>Originally developed for <em>post hoc</em> use with the <code>fireSense</code> suite of wildfire modules.</p>
+<div class="section level1">
+<h1 id="links-to-other-modules">Links to other modules<a class="anchor" aria-label="anchor" href="#links-to-other-modules"></a>
+</h1>
+<p>Uses <code>burnMap</code> and <code>burnSummary</code> from <code>fireSense_burn</code>.</p>
 </div>
-</div>
+
   </div>
 
   <div class="col-md-3 hidden-xs hidden-sm" id="pkgdown-sidebar">
