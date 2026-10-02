@@ -9,7 +9,7 @@ defineModule(sim, list(
     person("Ian MS", "Eddy", email = "ian.eddy@nrcan-rncan.gc.ca", role = "aut")
   ),
   childModules = character(0),
-  version = list(fireSense_summary = "1.0.1.9003"),
+  version = list(fireSense_summary = "1.0.5"),
   timeframe = as.POSIXlt(c(NA, NA)),
   timeunit = "year",
   citation = list("citation.bib"),
@@ -17,29 +17,28 @@ defineModule(sim, list(
   loadOrder = list(after = c("fireSense_burn")),
   reqdPkgs = list(
     "archive", "assertthat", "cowplot", "data.table", "fs", "ggplot2", "googledrive",
+    "FOR-CAST/fireregimetools@main (>= 0.1.0.9001)", ## fetch_nfdb_points()
     "purrr", "qs2", "RColorBrewer", "reproducible", "terra", "tidyterra",
     "raster", "rasterVis", ## TODO: remove these once fireSenseUtils::plotCumulativeBurns switched to ggplot2/tidyterra
-    "PredictiveEcology/fireSenseUtils@development (>= 0.1.2.9000)",
-    "PredictiveEcology/SpaDES.core@development (>= 3.2.1.9001)", ## resolveSimYears()
+    "PredictiveEcology/fireSenseUtils@development (>= 0.2.3.9001)", ## plot*(simFiles =)
+    "PredictiveEcology/SpaDES.core@development (>= 3.2.1.9001)", ## dirnamesFromSet(), resolveSimYears(), padYears()
     "PredictiveEcology/SpaDES.tools@development (>= 2.1.1.9000)"
   ),
   parameters = rbind(
-    #defineParameter("paramName", "paramClass", value, min, max, "parameter description"),
     defineParameter("climateScenario", "character", NA, NA, NA,
-                    desc = paste("name of CIMP6 climate scenarios including SSP,",
-                                 "formatted as in `ClimateNA`, using underscores as separator.",
-                                 "E.g., 'CanESM5_SSP370'.")),
+                    desc = paste("Name of the CMIP6 climate scenario including SSP, formatted as in `ClimateNA`,",
+                                 "e.g. 'CanESM5_SSP370'. Used in figure filenames (multi mode).")),
     defineParameter("mode", "character", "single", NA, NA,
-                    paste("use 'single' to run part of a simulation;",
-                          "use 'multi' to run as part of postprocessing multiple runs.")),
+                    paste("'single': run within a simulation, saving `burnMap` and `burnSummary` at `end(sim)`.",
+                          "'multi': summarize the saved outputs of several replicates in figures.")),
     defineParameter("simOutputPath", "character", outputPath(sim), NA, NA,
-                    desc = "Directory specifying the location of the simulation outputs."),
+                    desc = "Directory holding the replicate output directories, and where figures are written (multi mode)."),
     defineParameter(".studyAreaName", "character", NA, NA, NA,
-                    desc = "Human-readable name for the study area used. If `NA`, a hash of `rasterToMatch` will be used."),
+                    desc = paste("Study area name; used in figure paths and filenames (multi mode).",
+                                 "If `NA`, a hash of `rasterToMatch` is used.")),
     defineParameter("reps", "integer", 1L:10L, 1, NA,
-                    desc = paste("number of replicates/runs per study area and climate scenario.",
-                                 "NOTE: `mclapply` is used internally, so you should set",
-                                 "`options(mc.cores = nReps)` to run in parallel.")),
+                    desc = paste("Replicate numbers to summarize (multi mode). Files are read with `mclapply`;",
+                                 "set `options(mc.cores = )` to run in parallel.")),
     defineParameter("years", "integer", c(NA_integer_, NA_integer_), NA, NA,
                     desc = paste("Which two simulation years should be compared?",
                                  "Typically start and end years.",
@@ -47,23 +46,23 @@ defineModule(sim, list(
   ),
   inputObjects = bindrows(
     expectsInput("burnMap", "SpatRaster",
-                 desc = paste("Cumulative burn map.", "Required in single mode."),
+                 desc = "Cumulative burn map from `fireSense_burn`. Required in single mode.",
                  sourceURL = NA),
     expectsInput("burnSummary", "data.table",
-                 paste("Fire summary table from `fireSense_burn`.", "Required in single mode."),
+                 "Fire summary table from `fireSense_burn`. Required in single mode.",
                  sourceURL = NA),
     expectsInput("firePolys", "list", sourceURL = NA,
-                 paste0("Optional. This module will download this if it does not exist. ",
-                        "List of sf polygon objects representing annual fire polygons.")),
+                 paste("Optional; multi mode. List of annual historical fire polygons.",
+                       "If missing, the NFDB polygons are downloaded.")),
     expectsInput("ignitionFirePoints", "SpatVector", sourceURL = NA,
-                 paste0("Optional. This module will download this if it does not exist. ",
-                        "Historical fire ignition points.")),
+                 paste("Optional; multi mode. Historical fire ignition points.",
+                       "If missing, the NFDB points are downloaded.")),
     expectsInput("outputsDF", "data.table",
-                 desc = paste("The rbindlisted outputs(sim) of all the sims being used; i.e., it ",
-                              "will contain all the files that may exist"),
+                 desc = paste("Optional; multi mode. `outputs(sim)` of all replicates, row-bound. Its `file` column",
+                              "locates the burn maps and summaries. If missing, `simOutputPath` is searched."),
                  sourceURL = NA),
     expectsInput("rasterToMatch", "SpatRaster",
-                 paste("template raster used by the simulations for summary reporting"),
+                 "Template raster of the simulations. Required in multi mode.",
                  sourceURL = NA)
   ),
   outputObjects = bindrows(
@@ -71,9 +70,18 @@ defineModule(sim, list(
   )
 ))
 
-## event types
-#   - type `init` is required for initialization
-
+#' Event dispatcher
+#'
+#' `init`: in single mode, schedules `save_single` at `end(sim)`; in multi mode,
+#' runs `InitMulti()` and makes the burn summary, cumulative burn and historic
+#' fire figures. `save_single` writes `burnMap` (`.tif`) and `burnSummary` (`.csv`)
+#' to `outputPath(sim)`.
+#'
+#' @param sim A `simList`.
+#' @param eventTime Time of the event.
+#' @param eventType `"init"` or `"save_single"`.
+#'
+#' @return The `simList`, invisibly.
 doEvent.fireSense_summary = function(sim, eventTime, eventType) {
   switch(
     eventType,
@@ -133,15 +141,20 @@ doEvent.fireSense_summary = function(sim, eventTime, eventType) {
       data.table::fwrite(sim$burnSummary, file = f_burnSummary)
       sim <- registerOutputs(f_burnSummary, sim)
     },
-    noEventWarning(sim)
+    warning(noEventWarning(sim))
   )
   return(invisible(sim))
 }
 
+#' Find the replicate output files and the historical fires (multi mode)
+#'
+#' Stops if expected burn maps or burn summaries are missing from `simOutputPath`.
+#'
+#' @param sim A `simList`.
+#'
+#' @return The `simList`, invisibly, with `mod$simFiles` (`NULL` without `outputsDF`),
+#'   `mod$firePolys` and `mod$ignitionFirePoints` set, and `P(sim)$years` resolved.
 InitMulti <- function(sim) {
-  # # ! ----- EDIT BELOW ----- ! #
-
-  browser()
   ## check for necessary output files -----------------------------------------------
   ## NOTE: don't load simLists -- slow and unreliable
   mod$useOutputs <- NROW(sim$outputsDF) > 0
@@ -204,8 +217,6 @@ InitMulti <- function(sim) {
       tidyterra::bind_spat_rows() |>
       tidyterra::mutate(
         YEAR = as.integer(YEAR)
-        #MONTH = as.integer(MONTH),
-        #DAY = as.integer(DAY)
       )
   } else {
     mod$firePolys <- {
@@ -250,60 +261,33 @@ InitMulti <- function(sim) {
           SIZE_HA = ADJ_HA
         )
     } else {
-      mod$firePolys <- sim$firePolys |>
+      ## NOTE: `mod$firePolys`, not `sim$firePolys`: by this point the polygons have
+      ## been bound and typed above, whereas when they were supplied as an input
+      ## `sim$firePolys` is still the *list* of annual SpatVectors, which
+      ## tidyterra::mutate() cannot take.
+      mod$firePolys <- mod$firePolys |>
         tidyterra::mutate(
           SIZE_HA = POLY_HA
         )
     }
   }
-  
-  ## TODO: use an updated/working prepInputs version (fireSenseUtils::getFirePoints_NFDB_V2?)
-  if (exists("ignitionFirePoints", envir(sim))) {
-    mod$ignitionFirePoints <- sim$ignitionFirePoints
+
+  ## NFDB points, harmonised and clipped to the template raster by fireregimetools (the URL this
+  ## module used to hard-code, .../NFDB_point.zip, returns 404 now)
+  mod$ignitionFirePoints <- if (exists("ignitionFirePoints", envir(sim))) {
+    sim$ignitionFirePoints
   } else {
-    mod$ignitionFirePoints <- {
-      dst <- inputPath(sim)
-
-      nfdb_url <- "http://cwfis.cfs.nrcan.gc.ca/downloads/nfdb/fire_pnt/current_version/NFDB_point.zip"
-      nfdb_zip <- file.path(dst, basename(nfdb_url))
-
-      if (!file.exists(nfdb_zip)) {
-        download.file(nfdb_url, destfile = nfdb_zip)
-      }
-
-      all_nfdb_files <- fs::dir_ls(dst, regexp = "NFDB_point_.*")
-
-      if (length(all_nfdb_files) != 10) {
-        archive::archive_extract(nfdb_zip, dst)
-      }
-
-      nfdb_shp <- fs::dir_ls(dst, regexp = "NFDB_point_.*[.]shp$")
-
-      ## NOTE: using terra here because it's much faster than sf
-      p <- terra::vect(nfdb_shp)
-
-      ## NOTE: terra::makeValid takes so long;
-      ## just drop the tiny number of invalid geometries
-      p[terra::is.valid(p), ] |>
-        tidyterra::mutate(
-          YEAR = as.integer(YEAR),
-          MONTH = as.integer(MONTH),
-          DAY = as.integer(DAY)
-        ) |>
-        terra::project(sim$rasterToMatch)
-    }
+    fireregimetools::fetch_nfdb_points(sim$rasterToMatch, dest = inputPath(sim))
   }
-
-  # ! ----- STOP EDITING ----- ! #
 
   return(invisible(sim))
 }
 
+#' No default inputs
+#'
+#' @param sim A `simList`.
+#'
+#' @return The `simList`, invisibly.
 .inputObjects <- function(sim) {
-  # ! ----- EDIT BELOW ----- ! #
-
-  ## nothing here
-
-  # ! ----- STOP EDITING ----- ! #
   return(invisible(sim))
 }
