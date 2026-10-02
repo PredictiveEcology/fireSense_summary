@@ -1,3 +1,9 @@
+# fireSense_summary 1.0.5
+
+- `InitMulti()` no longer stops at a leftover `browser()` call. Dead code removed; the functions, metadata and Rmd are documented.
+- `SIZE_HA` is built from `mod$firePolys`, so the downloaded-polygons branch works.
+- An unknown event type now gives a warning.
+
 # fireSense_summary 1.0.4
 
 - reqdPkgs now lists `archive`, which the module calls with `::` but did not list. Version 1.0.4.
