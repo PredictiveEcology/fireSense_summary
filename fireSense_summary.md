@@ -1,7 +1,7 @@
 ---
 title: "fireSense_summary"
 author: "Alex Chubaty"
-date: "20 September 2026"
+date: "02 October 2026"
 output:
   html_document:
     df_print: paged
@@ -55,7 +55,7 @@ Historical fires for the comparison figure come from `firePolys` and `ignitionFi
 |:---------------|:----------|:------------|:---|:---|:-----------------------------------------------------------------------------------------------------------------------------------------------------------|
 |climateScenario |character  |NA           |NA  |NA  |Name of the CMIP6 climate scenario including SSP, formatted as in `ClimateNA`, e.g. 'CanESM5_SSP370'. Used in figure filenames (multi mode).                |
 |mode            |character  |single       |NA  |NA  |'single': run within a simulation, saving `burnMap` and `burnSummary` at `end(sim)`. 'multi': summarize the saved outputs of several replicates in figures. |
-|simOutputPath   |character  |outputPa.... |NA  |NA  |Directory holding the replicate output directories, and where figures are written (multi mode).                                                             |
+|simOutputPath   |character  |/tmp/Rtm.... |NA  |NA  |Directory holding the replicate output directories, and where figures are written (multi mode).                                                             |
 |studyAreaName   |character  |NA           |NA  |NA  |Study area name; used in figure paths and filenames (multi mode).                                                                                           |
 |reps            |integer    |1, 2, 3,.... |1   |NA  |Replicate numbers to summarize (multi mode). Files are read with `mclapply`; set `options(mc.cores = )` to run in parallel.                                 |
 |years           |integer    |NA, NA       |NA  |NA  |Which two simulation years should be compared? Typically start and end years. Defaults to the simulation's own start and end times.                         |
@@ -80,8 +80,8 @@ Single mode only; see `save_single`.
 
 |objectName         |objectClass |desc                                                                                                                                                               |sourceURL |
 |:------------------|:-----------|:------------------------------------------------------------------------------------------------------------------------------------------------------------------|:---------|
-|burnMap            |SpatRaster  |Cumulative burn map from `fireSense_burn`. Required in single mode.                                                                                                     |NA        |
-|burnSummary        |data.table  |Fire summary table from `fireSense_burn`. Required in single mode.                                                                                                      |NA        |
+|burnMap            |SpatRaster  |Cumulative burn map from `fireSense_burn`. Required in single mode.                                                                                                |NA        |
+|burnSummary        |data.table  |Fire summary table from `fireSense_burn`. Required in single mode.                                                                                                 |NA        |
 |firePolys          |list        |Optional; multi mode. List of annual historical fire polygons. If missing, the NFDB polygons are downloaded.                                                       |NA        |
 |ignitionFirePoints |SpatVector  |Optional; multi mode. Historical fire ignition points. If missing, the NFDB points are downloaded.                                                                 |NA        |
 |outputsDF          |data.table  |Optional; multi mode. `outputs(sim)` of all replicates, row-bound. Its `file` column locates the burn maps and summaries. If missing, `simOutputPath` is searched. |NA        |
