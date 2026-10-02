@@ -7,7 +7,8 @@
 makeMultiSim <- function(firePolys = toyFirePolys(), outputsDF = NULL, reps = 1L,
                          years = c(NA_integer_, NA_integer_),
                          times = list(start = 2011, end = 2013),
-                         simOutputPath = NULL, objects = list()) {
+                         simOutputPath = NULL, objects = list(),
+                         ignitionFirePoints = toyIgnitionPoints()) {
   out <- withr::local_tempdir(.local_envir = parent.frame())
   if (is.null(simOutputPath)) simOutputPath <- out
   if (is.null(outputsDF)) {
@@ -23,8 +24,8 @@ makeMultiSim <- function(firePolys = toyFirePolys(), outputsDF = NULL, reps = 1L
       saveTime = 2013
     )
   }
-  objs <- c(list(rasterToMatch = toyRTM(), outputsDF = outputsDF,
-                 ignitionFirePoints = toyIgnitionPoints()), objects)
+  objs <- c(list(rasterToMatch = toyRTM(), outputsDF = outputsDF), objects)
+  if (!is.null(ignitionFirePoints)) objs$ignitionFirePoints <- ignitionFirePoints
   if (!is.null(firePolys)) objs$firePolys <- firePolys
   SpaDES.core::simInit(
     times = times,
@@ -163,3 +164,22 @@ test_that("without outputsDF the simOutputPath is globbed, and missing files sto
 ## missing. This is pre-existing on `development` (same two greps, same
 ## `filesExpected`), is not touched by this PR, and is not asserted here because
 ## writing a test around it would enshrine it as correct behaviour.
+
+test_that("without ignitionFirePoints they come from fireregimetools, not a hard-coded URL", {
+  ## The module used to download `.../fire_pnt/current_version/NFDB_point.zip`, which now returns
+  ## 404, so multi mode stopped in InitMulti() for any run that did not supply the points.
+  got <- list()
+  testthat::local_mocked_bindings(
+    fetch_nfdb_points = function(study_area, ...) {
+      got <<- list(study_area = study_area, dest = list(...)$dest)
+      toyIgnitionPoints()
+    },
+    .package = "fireregimetools"
+  )
+  s <- runInitMulti(makeMultiSim(ignitionFirePoints = NULL))
+
+  expect_s4_class(got$study_area, "SpatRaster")
+  expect_equal(terra::ext(got$study_area), terra::ext(toyRTM()))
+  expect_s4_class(modOf(s)$ignitionFirePoints, "SpatVector")
+  expect_equal(modOf(s)$ignitionFirePoints$YEAR, c(1990L, 1991L))
+})

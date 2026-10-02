@@ -17,10 +17,11 @@ defineModule(sim, list(
   loadOrder = list(after = c("fireSense_burn")),
   reqdPkgs = list(
     "archive", "assertthat", "cowplot", "data.table", "fs", "ggplot2", "googledrive",
+    "FOR-CAST/fireregimetools@main (>= 0.1.0.9001)", ## fetch_nfdb_points()
     "purrr", "qs2", "RColorBrewer", "terra", "tidyterra",
     "raster", "rasterVis", ## TODO: remove these once fireSenseUtils::plotCumulativeBurns switched to ggplot2/tidyterra
-    "PredictiveEcology/fireSenseUtils@development (>= 0.1.2.9000)",
-    "PredictiveEcology/SpaDES.core@development (>= 3.0.3.9003)",
+    "PredictiveEcology/fireSenseUtils@development (>= 0.2.3.9001)", ## plot*(simFiles =)
+    "PredictiveEcology/SpaDES.core@development (>= 3.2.1.9001)", ## dirnamesFromSet(), resolveSimYears(), padYears()
     "PredictiveEcology/SpaDES.tools@development (>= 2.1.1.9000)"
   ),
   parameters = rbind(
@@ -267,41 +268,12 @@ InitMulti <- function(sim) {
     }
   }
 
-  ## TODO: use an updated/working prepInputs version (fireSenseUtils::getFirePoints_NFDB_V2?)
-  if (exists("ignitionFirePoints", envir(sim))) {
-    mod$ignitionFirePoints <- sim$ignitionFirePoints
+  ## NFDB points, harmonised and clipped to the template raster by fireregimetools (the URL this
+  ## module used to hard-code, .../NFDB_point.zip, returns 404 now)
+  mod$ignitionFirePoints <- if (exists("ignitionFirePoints", envir(sim))) {
+    sim$ignitionFirePoints
   } else {
-    mod$ignitionFirePoints <- {
-      dst <- inputPath(sim)
-
-      nfdb_url <- "http://cwfis.cfs.nrcan.gc.ca/downloads/nfdb/fire_pnt/current_version/NFDB_point.zip"
-      nfdb_zip <- file.path(dst, basename(nfdb_url))
-
-      if (!file.exists(nfdb_zip)) {
-        download.file(nfdb_url, destfile = nfdb_zip)
-      }
-
-      all_nfdb_files <- fs::dir_ls(dst, regexp = "NFDB_point_.*")
-
-      if (length(all_nfdb_files) != 10) {
-        archive::archive_extract(nfdb_zip, dst)
-      }
-
-      nfdb_shp <- fs::dir_ls(dst, regexp = "NFDB_point_.*[.]shp$")
-
-      ## NOTE: using terra here because it's much faster than sf
-      p <- terra::vect(nfdb_shp)
-
-      ## NOTE: terra::makeValid takes so long;
-      ## just drop the tiny number of invalid geometries
-      p[terra::is.valid(p), ] |>
-        tidyterra::mutate(
-          YEAR = as.integer(YEAR),
-          MONTH = as.integer(MONTH),
-          DAY = as.integer(DAY)
-        ) |>
-        terra::project(sim$rasterToMatch)
-    }
+    fireregimetools::fetch_nfdb_points(sim$rasterToMatch, dest = inputPath(sim))
   }
 
   return(invisible(sim))
