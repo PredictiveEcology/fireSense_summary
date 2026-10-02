@@ -6,6 +6,12 @@
 * `reqdPkgs` lists `fireregimetools` and has floors for the functions the module calls: SpaDES.core 3.2.1.9001 (`dirnamesFromSet()`, `resolveSimYears()`, `padYears()`) and fireSenseUtils 0.2.3.9001 (`simFiles`).
 * The module is a child of the `fireSense` parent, so a project that selects modules by name pattern (e.g. "summar") has to add `fireSense_summary` itself; otherwise nothing runs.
 
+# fireSense_summary 1.0.5
+
+- `InitMulti()` no longer stops at a leftover `browser()` call. Dead code removed; the functions, metadata and Rmd are documented.
+- `SIZE_HA` is built from `mod$firePolys`, so the downloaded-polygons branch works.
+- An unknown event type now gives a warning.
+
 # fireSense_summary 1.0.4
 
 - reqdPkgs now lists `archive`, which the module calls with `::` but did not list. Version 1.0.4.
