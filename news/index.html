@@ -52,6 +52,16 @@
     </div>
 
     <div class="section level2">
+<h2 class="page-header" data-toc-text="development version" id="firesense_summary-development-version">fireSense_summary (development version)<a class="anchor" aria-label="anchor" href="#firesense_summary-development-version"></a></h2>
+<div class="section level3">
+<h3 id="multi-mode-development-version">Multi mode<a class="anchor" aria-label="anchor" href="#multi-mode-development-version"></a></h3>
+<ul><li>Without <code>ignitionFirePoints</code>, <code><a href="../reference/InitMulti.html">InitMulti()</a></code> now gets the NFDB points from <code><a href="https://rdrr.io/pkg/fireregimetools/man/fetch_nfdb_points.html" class="external-link">fireregimetools::fetch_nfdb_points()</a></code>. It used to download <code>.../fire_pnt/current_version/NFDB_point.zip</code>, which returns 404, so multi mode stopped in <code><a href="../reference/InitMulti.html">InitMulti()</a></code> unless the points were supplied.</li>
+<li>
+<code>reqdPkgs</code> lists <code>fireregimetools</code> and has floors for the functions the module calls: SpaDES.core 3.2.1.9001 (<code><a href="https://spades-core.predictiveecology.org/reference/dirnamesFromSet.html" class="external-link">dirnamesFromSet()</a></code>, <code><a href="https://spades-core.predictiveecology.org/reference/resolveSimYears.html" class="external-link">resolveSimYears()</a></code>, <code><a href="https://reproducible.predictiveecology.org/reference/padYears.html" class="external-link">padYears()</a></code>) and fireSenseUtils 0.2.3.9001 (<code>simFiles</code>).</li>
+<li>The module is a child of the <code>fireSense</code> parent, so a project that selects modules by name pattern (e.g. “summar”) has to add <code>fireSense_summary</code> itself; otherwise nothing runs.</li>
+</ul></div>
+</div>
+    <div class="section level2">
 <h2 class="page-header" data-toc-text="1.0.5" id="firesense_summary-105">fireSense_summary 1.0.5<a class="anchor" aria-label="anchor" href="#firesense_summary-105"></a></h2>
 <ul><li>
 <code><a href="../reference/InitMulti.html">InitMulti()</a></code> no longer stops at a leftover <code><a href="https://rdrr.io/r/base/browser.html" class="external-link">browser()</a></code> call. Dead code removed; the functions, metadata and Rmd are documented.</li>
