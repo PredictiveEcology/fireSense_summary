@@ -1,3 +1,5 @@
+# fireSense_summary (development version)
+
 # fireSense_summary 1.1.0
 
 This release fixes the multi-run summary, which stopped partway because of leftover debugging code, and the fire-size calculation when fire polygons are downloaded. The module now runs after the renamed `fireSense_burn` module; with the old name the order was silently ignored.
