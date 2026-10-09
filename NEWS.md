@@ -15,6 +15,12 @@
 - Requires SpaDES.core >= 3.2.1.9001, for `resolveSimYears()`.
 # fireSense_summary (development version)
 
+# fireSense_summary 1.1.0
+
+This release fixes the multi-run summary, which stopped partway because of leftover debugging code, and the fire-size calculation when fire polygons are downloaded. The module now runs after the renamed `fireSense_burn` module; with the old name the order was silently ignored.
+
+The module also has a documentation website, its manual is shown on the repository page, and the package list is complete.
+
 ## Multi mode
 
 * Without `ignitionFirePoints`, `InitMulti()` now gets the NFDB points from `fireregimetools::fetch_nfdb_points()`. It used to download `.../fire_pnt/current_version/NFDB_point.zip`, which returns 404, so multi mode stopped in `InitMulti()` unless the points were supplied.
