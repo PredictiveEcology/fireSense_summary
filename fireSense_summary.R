@@ -195,7 +195,7 @@ hindcastFiles <- c(reps = "hindcast_reps.csv", sizes = "hindcast_sizes.csv", obs
 #'
 #' @return The `simList`, invisibly, with `mod$hindcastReps` and `mod$hindcastSizes` extended.
 hindcastRecord <- function(sim) {
-  needed <- c("rasterToMatchELF", "rstAnnualBurnID", "ignitionFirePoints", "firePolys")
+  needed <- c("rasterToMatchELF", "rstAnnualBurnID", "ignitionsAndEscapes", "ignitionFirePoints", "firePolys")
   missing <- needed[vapply(needed, function(o) is.null(sim[[o]]), logical(1))]
   if (length(missing))
     stop("hindcastYear is set, so fireSense_summary needs: ", paste(missing, collapse = ", "))

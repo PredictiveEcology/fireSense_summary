@@ -79,6 +79,12 @@ test_that("hindcast stops at the first rep-year when an input is missing", {
   expect_error(SpaDES.core::spades(s, debug = FALSE), "firePolys")
 })
 
+test_that("hindcast stops when ignitionsAndEscapes is missing, rather than counting NA ignitions", {
+  s <- makeHindcastSim()
+  s$ignitionsAndEscapes <- NULL
+  expect_error(SpaDES.core::spades(s, debug = FALSE), "ignitionsAndEscapes")
+})
+
 test_that("hindcast multi mode pools the parameter-set folders into three figures", {
   skip_if_not_installed("ggplot2")
   root <- withr::local_tempdir()
