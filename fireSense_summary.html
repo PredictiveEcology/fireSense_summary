@@ -17,7 +17,7 @@
       </button>
       <span class="navbar-brand">
         <a class="navbar-link" href="index.html">fireSense_summary</a>
-        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">1.1.0.9000</span>
+        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">1.1.0.9001</span>
       </span>
     </div>
 
@@ -84,7 +84,7 @@
 </div>
 <div class="section level1">
 <h1 id="parameters">Parameters<a class="anchor" aria-label="anchor" href="#parameters"></a></h1>
-<table class="table"><colgroup><col width="7%"><col width="5%"><col width="6%"><col width="1%"><col width="1%"><col width="76%"></colgroup><thead><tr><th align="left">paramName</th>
+<table class="table"><colgroup><col width="3%"><col width="2%"><col width="2%"><col width="0%"><col width="0%"><col width="90%"></colgroup><thead><tr><th align="left">paramName</th>
 <th align="left">paramClass</th>
 <th align="left">default</th>
 <th align="left">min</th>
@@ -120,6 +120,24 @@
 <td align="left">1</td>
 <td align="left">NA</td>
 <td align="left">Replicate numbers to summarize (multi mode). Files are read with <code>mclapply</code>; set <code>options(mc.cores = )</code> to run in parallel.</td>
+</tr><tr><td align="left">escapeSizeHa</td>
+<td align="left">numeric</td>
+<td align="left">50</td>
+<td align="left">0</td>
+<td align="left">NA</td>
+<td align="left">Fire size (ha) counted as an escape in the hindcast (<code>nFires50</code>); as in the fit.</td>
+</tr><tr><td align="left">hindcastInterval</td>
+<td align="left">numeric</td>
+<td align="left">1</td>
+<td align="left">0</td>
+<td align="left">NA</td>
+<td align="left">Hindcast: time between the simulated rep-years. A job for year Y runs times Y, Y + interval, …; rep = round((time - hindcastYear) / interval) + 1. Set it to the predict modules’ interval (e.g. 0.001).</td>
+</tr><tr><td align="left">hindcastYear</td>
+<td align="left">integer</td>
+<td align="left">NA</td>
+<td align="left">NA</td>
+<td align="left">NA</td>
+<td align="left">Hindcast validation: the observed year the simulated rep-years are compared with. <code>NA</code> (default): no hindcast. Single mode records each rep-year and, at <code>end(sim)</code>, writes <code>hindcast_reps.csv</code>, <code>hindcast_sizes.csv</code>, <code>hindcast_observed.csv</code>, <code>hindcast_observedSizes.csv</code>, <code>hindcast_observedPolys.gpkg</code>, <code>hindcast_burnMap.tif</code> and one <code>hindcast_burnID_rep&lt;rep&gt;.tif</code> per rep. Multi mode pools the replicate folders (parameter sets) in hindcast figures instead of the usual multi-mode figures.</td>
 </tr><tr><td align="left">years</td>
 <td align="left">integer</td>
 <td align="left">NA, NA</td>
@@ -165,6 +183,18 @@
 </tr><tr><td align="left">ignitionFirePoints</td>
 <td align="left">SpatVector</td>
 <td align="left">Optional; multi mode. Historical fire ignition points. If missing, the NFDB points are downloaded.</td>
+<td align="left">NA</td>
+</tr><tr><td align="left">ignitionsAndEscapes</td>
+<td align="left">data.table</td>
+<td align="left">Optional; hindcast (single mode). This year’s ignitions (<code>pixelID</code>, <code>escaped</code>) from <code>fireSense_ignitionPredict</code>.</td>
+<td align="left">NA</td>
+</tr><tr><td align="left">rasterToMatchELF</td>
+<td align="left">SpatRaster</td>
+<td align="left">Optional; hindcast (single mode). The ELF core; the simulation and the observations are clipped to it.</td>
+<td align="left">NA</td>
+</tr><tr><td align="left">rstAnnualBurnID</td>
+<td align="left">SpatRaster</td>
+<td align="left">Optional; hindcast (single mode). This year’s fire IDs from <code>fireSense_burn</code>.</td>
 <td align="left">NA</td>
 </tr><tr><td align="left">outputsDF</td>
 <td align="left">data.table</td>
