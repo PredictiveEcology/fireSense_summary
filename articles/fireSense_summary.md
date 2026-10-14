@@ -1,7 +1,7 @@
 ---
 title: "fireSense_summary"
 author: "Alex Chubaty"
-date: "08 October 2026"
+date: "14 October 2026"
 output:
   html_document:
     df_print: paged
@@ -53,14 +53,17 @@ Historical fires for the comparison figure come from `firePolys` and `ignitionFi
 # Parameters
 
 
-|paramName       |paramClass |default      |min |max |paramDesc                                                                                                                                                   |
-|:---------------|:----------|:------------|:---|:---|:-----------------------------------------------------------------------------------------------------------------------------------------------------------|
-|climateScenario |character  |NA           |NA  |NA  |Name of the CMIP6 climate scenario including SSP, formatted as in `ClimateNA`, e.g. 'CanESM5_SSP370'. Used in figure filenames (multi mode).                |
-|mode            |character  |single       |NA  |NA  |'single': run within a simulation, saving `burnMap` and `burnSummary` at `end(sim)`. 'multi': summarize the saved outputs of several replicates in figures. |
-|simOutputPath   |character  |/tmp/Rtm.... |NA  |NA  |Directory holding the replicate output directories, and where figures are written (multi mode).                                                             |
-|studyAreaName   |character  |NA           |NA  |NA  |Study area name; used in figure paths and filenames (multi mode).                                                                                           |
-|reps            |integer    |1, 2, 3,.... |1   |NA  |Replicate numbers to summarize (multi mode). Files are read with `mclapply`; set `options(mc.cores = )` to run in parallel.                                 |
-|years           |integer    |NA, NA       |NA  |NA  |Which two simulation years should be compared? Typically start and end years. Defaults to the simulation's own start and end times.                         |
+|paramName        |paramClass |default      |min |max |paramDesc                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
+|:----------------|:----------|:------------|:---|:---|:--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+|climateScenario  |character  |NA           |NA  |NA  |Name of the CMIP6 climate scenario including SSP, formatted as in `ClimateNA`, e.g. 'CanESM5_SSP370'. Used in figure filenames (multi mode).                                                                                                                                                                                                                                                                                                                                                             |
+|mode             |character  |single       |NA  |NA  |'single': run within a simulation, saving `burnMap` and `burnSummary` at `end(sim)`. 'multi': summarize the saved outputs of several replicates in figures.                                                                                                                                                                                                                                                                                                                                              |
+|simOutputPath    |character  |/tmp/Rtm.... |NA  |NA  |Directory holding the replicate output directories, and where figures are written (multi mode).                                                                                                                                                                                                                                                                                                                                                                                                          |
+|studyAreaName    |character  |NA           |NA  |NA  |Study area name; used in figure paths and filenames (multi mode).                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+|reps             |integer    |1, 2, 3,.... |1   |NA  |Replicate numbers to summarize (multi mode). Files are read with `mclapply`; set `options(mc.cores = )` to run in parallel.                                                                                                                                                                                                                                                                                                                                                                              |
+|escapeSizeHa     |numeric    |50           |0   |NA  |Fire size (ha) counted as an escape in the hindcast (`nFires50`); as in the fit.                                                                                                                                                                                                                                                                                                                                                                                                                         |
+|hindcastInterval |numeric    |1            |0   |NA  |Hindcast: time between the simulated rep-years. A job for year Y runs times Y, Y + interval, ...; rep = round((time - hindcastYear) / interval) + 1. Set it to the predict modules' interval (e.g. 0.001).                                                                                                                                                                                                                                                                                               |
+|hindcastYear     |integer    |NA           |NA  |NA  |Hindcast validation: the observed year the simulated rep-years are compared with. `NA` (default): no hindcast. Single mode records each rep-year and, at `end(sim)`, writes `hindcast_reps.csv`, `hindcast_sizes.csv`, `hindcast_observed.csv`, `hindcast_observedSizes.csv`, `hindcast_observedPolys.gpkg`, `hindcast_burnMap.tif` and one `hindcast_burnID_rep<rep>.tif` per rep. Multi mode pools the replicate folders (parameter sets) in hindcast figures instead of the usual multi-mode figures. |
+|years            |integer    |NA, NA       |NA  |NA  |Which two simulation years should be compared? Typically start and end years. Defaults to the simulation's own start and end times.                                                                                                                                                                                                                                                                                                                                                                      |
 
 # Events
 
@@ -80,14 +83,17 @@ Single mode only; see `save_single`.
 ## Input data
 
 
-|objectName         |objectClass |desc                                                                                                                                                               |sourceURL |
-|:------------------|:-----------|:------------------------------------------------------------------------------------------------------------------------------------------------------------------|:---------|
-|burnMap            |SpatRaster  |Cumulative burn map from `fireSense_burn`. Required in single mode.                                                                                                |NA        |
-|burnSummary        |data.table  |Fire summary table from `fireSense_burn`. Required in single mode.                                                                                                 |NA        |
-|firePolys          |list        |Optional; multi mode. List of annual historical fire polygons. If missing, the NFDB polygons are downloaded.                                                       |NA        |
-|ignitionFirePoints |SpatVector  |Optional; multi mode. Historical fire ignition points. If missing, the NFDB points are downloaded.                                                                 |NA        |
-|outputsDF          |data.table  |Optional; multi mode. `outputs(sim)` of all replicates, row-bound. Its `file` column locates the burn maps and summaries. If missing, `simOutputPath` is searched. |NA        |
-|rasterToMatch      |SpatRaster  |Template raster of the simulations. Required in multi mode.                                                                                                        |NA        |
+|objectName          |objectClass |desc                                                                                                                                                               |sourceURL |
+|:-------------------|:-----------|:------------------------------------------------------------------------------------------------------------------------------------------------------------------|:---------|
+|burnMap             |SpatRaster  |Cumulative burn map from `fireSense_burn`. Required in single mode.                                                                                                |NA        |
+|burnSummary         |data.table  |Fire summary table from `fireSense_burn`. Required in single mode.                                                                                                 |NA        |
+|firePolys           |list        |Optional; multi mode. List of annual historical fire polygons. If missing, the NFDB polygons are downloaded.                                                       |NA        |
+|ignitionFirePoints  |SpatVector  |Optional; multi mode. Historical fire ignition points. If missing, the NFDB points are downloaded.                                                                 |NA        |
+|ignitionsAndEscapes |data.table  |Optional; hindcast (single mode). This year's ignitions (`pixelID`, `escaped`) from `fireSense_ignitionPredict`.                                                   |NA        |
+|rasterToMatchELF    |SpatRaster  |Optional; hindcast (single mode). The ELF core; the simulation and the observations are clipped to it.                                                             |NA        |
+|rstAnnualBurnID     |SpatRaster  |Optional; hindcast (single mode). This year's fire IDs from `fireSense_burn`.                                                                                      |NA        |
+|outputsDF           |data.table  |Optional; multi mode. `outputs(sim)` of all replicates, row-bound. Its `file` column locates the burn maps and summaries. If missing, `simOutputPath` is searched. |NA        |
+|rasterToMatch       |SpatRaster  |Template raster of the simulations. Required in multi mode.                                                                                                        |NA        |
 
 ## Output data
 
