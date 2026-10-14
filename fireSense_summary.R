@@ -16,9 +16,9 @@ defineModule(sim, list(
   documentation = list("README.md", "fireSense_summary.Rmd"), ## same file
   loadOrder = list(after = c("fireSense_burn")),
   reqdPkgs = list(
-    "archive", "assertthat", "cowplot", "data.table", "fs", "ggplot2", "googledrive",
+    "assertthat", "cowplot", "data.table", "fs", "ggplot2", "googledrive",
     "FOR-CAST/fireregimetools@main (>= 0.1.0.9001)", ## fetch_nfdb_points()
-    "purrr", "qs2", "RColorBrewer", "terra", "tidyterra",
+    "purrr", "qs2", "RColorBrewer", "reproducible", "terra", "tidyterra",
     "raster", "rasterVis", ## TODO: remove these once fireSenseUtils::plotCumulativeBurns switched to ggplot2/tidyterra
     "PredictiveEcology/fireSenseUtils@development (>= 0.2.3.9092)", ## hindcast*() (after plot*(simFiles =))
     "PredictiveEcology/SpaDES.core@development (>= 3.2.1.9001)", ## dirnamesFromSet(), resolveSimYears(), padYears()
@@ -271,6 +271,16 @@ hindcastFigures <- function(sim) {
   invisible(sim)
 }
 
+## The National Fire Database polygon shapefiles, downloaded (once) and unzipped into `dst` by
+## prepInputs(), so the access is cached and appears in the download ledger (urlLog(sim)).
+## The zip holds two shapefiles (1972-2020 and 2021-2024), so `fun = NA`: prepInputs() returns
+## the unzipped paths and each shapefile is read by the caller.
+nfdbShapefiles <- function(dst) {
+  nfdb_url <- "https://cwfis.cfs.nrcan.gc.ca/downloads/nfdb/fire_poly/current_version/NFDB_poly.zip"
+  files <- reproducible::prepInputs(url = nfdb_url, destinationPath = dst, fun = NA)
+  grep("NFDB_poly_(1972to2020|2021to2024).*[.]shp$", files, value = TRUE)
+}
+
 #' Find the replicate output files and the historical fires (multi mode)
 #'
 #' Stops if expected burn maps or burn summaries are missing from `simOutputPath`.
@@ -345,21 +355,7 @@ InitMulti <- function(sim) {
       )
   } else {
     mod$firePolys <- {
-      dst <- inputPath(sim)
-      nfdb_url <- "https://cwfis.cfs.nrcan.gc.ca/downloads/nfdb/fire_poly/current_version/NFDB_poly.zip"
-      nfdb_zip <- file.path(dst, basename(nfdb_url))
-
-      if (!file.exists(nfdb_zip)) {
-        download.file(nfdb_url, destfile = nfdb_zip)
-      }
-
-      all_nfdb_files <- fs::dir_ls(dst, regexp = "NFDB_poly_(1972to2020|2021to2024).*")
-
-      if (length(all_nfdb_files) != 16) {
-        archive::archive_extract(nfdb_zip, dst)
-      }
-
-      nfdb_shp <- fs::dir_ls(dst, regexp = "NFDB_poly_(1972to2020|2021to2024).*[.]shp$")
+      nfdb_shp <- nfdbShapefiles(inputPath(sim))
 
       purrr::map(.x = nfdb_shp, .f = function(x) {
         p <- terra::vect(x)
