@@ -1,5 +1,7 @@
 # fireSense_summary (development version)
 
+* New parameter `hindcastYear` (default `NA`: no change) for the hindcast validation. Single mode records each rep-year (ignitions, escapes, area burned and fires of at least `escapeSizeHa` in the ELF core, from `fireSenseUtils::hindcastSimulated()`) every `hindcastInterval` and, at `end(sim)`, writes `hindcast_reps.csv`, `hindcast_sizes.csv`, `hindcast_observed.csv` (`fireSenseUtils::hindcastObserved()`), `hindcast_observedSizes.csv`, `hindcast_observedPolys.gpkg`, `hindcast_burnMap.tif` and `hindcast_burnID_rep<rep>.tif`. Rep-years may be decimal years (`rep = round((time - hindcastYear) / hindcastInterval) + 1`); the files are not named by `time(sim)`. Multi mode pools the replicate folders (parameter sets) into three `Plots()` figures: `hindcast_distributions`, `hindcast_sizes`, `hindcast_map`. New inputs `ignitionsAndEscapes`, `rasterToMatchELF`, `rstAnnualBurnID`; new parameters `escapeSizeHa`, `hindcastInterval`. Needs fireSenseUtils > 0.2.3.9091.
+
 # fireSense_summary 1.1.0
 
 This release fixes the multi-run summary, which stopped partway because of leftover debugging code, and the fire-size calculation when fire polygons are downloaded. The module now runs after the renamed `fireSense_burn` module; with the old name the order was silently ignored.
