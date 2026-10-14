@@ -21,8 +21,11 @@ test_that("inputs are the expected names and classes", {
       burnSummary        = "data.table",
       firePolys          = "list",
       ignitionFirePoints = "SpatVector",
+      ignitionsAndEscapes = "data.table",
       outputsDF          = "data.table",
-      rasterToMatch      = "SpatRaster")
+      rasterToMatch      = "SpatRaster",
+      rasterToMatchELF   = "SpatRaster",
+      rstAnnualBurnID    = "SpatRaster")
   )
 })
 
@@ -35,8 +38,8 @@ test_that("parameters are the expected names", {
   md <- SpaDES.core::moduleMetadata(module = moduleName, path = modulePath)
   expect_identical(
     sort(md$parameters$paramName),
-    sort(c(".studyAreaName", "climateScenario", "mode", "reps", "simOutputPath",
-           "years"))
+    sort(c(".studyAreaName", "climateScenario", "escapeSizeHa", "hindcastInterval", "hindcastYear", "mode", "reps",
+           "simOutputPath", "years"))
   )
 })
 
@@ -54,8 +57,9 @@ test_that("parameter classes and defaults are as declared", {
   p <- md$parameters[order(md$parameters$paramName), ]
   expect_identical(
     stats::setNames(unlist(p$paramClass), p$paramName),
-    c(.studyAreaName = "character", climateScenario = "character", mode = "character",
-      reps = "integer", simOutputPath = "character", years = "integer")
+    c(.studyAreaName = "character", climateScenario = "character", escapeSizeHa = "numeric", hindcastInterval = "numeric",
+      hindcastYear = "integer", mode = "character", reps = "integer",
+      simOutputPath = "character", years = "integer")
   )
   dflt <- stats::setNames(p$default, p$paramName)
   expect_identical(dflt$mode, "single")
@@ -64,6 +68,9 @@ test_that("parameter classes and defaults are as declared", {
   ## cannot silently summarise a year range the simulation never ran.
   expect_identical(dflt$years, c(NA_integer_, NA_integer_))
   expect_true(is.na(dflt$climateScenario))
+  ## no hindcast unless asked, and whole-year steps between rep-years if it is
+  expect_true(is.na(dflt$hindcastYear))
+  expect_identical(dflt$hindcastInterval, 1)
   expect_true(is.na(dflt$.studyAreaName))
 })
 
