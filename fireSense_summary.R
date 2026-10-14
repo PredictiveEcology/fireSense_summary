@@ -21,10 +21,13 @@ defineModule(sim, list(
     "purrr", "qs2", "RColorBrewer", "terra", "tidyterra",
     "raster", "rasterVis", ## TODO: remove these once fireSenseUtils::plotCumulativeBurns switched to ggplot2/tidyterra
     "PredictiveEcology/fireSenseUtils@development (>= 0.2.3.9092)", ## hindcast*() (after plot*(simFiles =))
-    "PredictiveEcology/SpaDES.core@development (>= 3.2.1.9001)", ## dirnamesFromSet(), resolveSimYears(), padYears()
+    "PredictiveEcology/SpaDES.core@development (>= 3.2.1.9037)", ## dirnamesFromSet(), resolveSimYears(), padYears()
     "PredictiveEcology/SpaDES.tools@development (>= 2.1.1.9000)"
   ),
   parameters = rbind(
+    defineParameter(".neverCache", "character", c("init", "save_single", "hindcastRecord", "hindcast"), NA, NA,
+                    paste("Events that are never cached, whatever `.useCache` says (read by SpaDES.core, 3.2.1.9037 or later):",
+                          "every event reads the run's output files or writes files (maps, csv, figures), none of which is in the event's cache key, and a cache hit would write nothing.")),
     defineParameter("climateScenario", "character", NA, NA, NA,
                     desc = paste("Name of the CMIP6 climate scenario including SSP, formatted as in `ClimateNA`,",
                                  "e.g. 'CanESM5_SSP370'. Used in figure filenames (multi mode).")),

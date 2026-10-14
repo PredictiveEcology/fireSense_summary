@@ -1,5 +1,7 @@
 # fireSense_summary (development version)
 
+- Fixed: All events (`init`, `save_single`, `hindcastRecord`, `hindcast`) are declared in the new `.neverCache` parameter, so they are never cached, even when `.useCache` (or `.globals`) is set. They read the run's output files and write maps, csv files and figures, which are not part of the event's cache key, and a cache hit writes nothing. Needs SpaDES.core >= 3.2.1.9037.
+
 * New parameter `hindcastYear` (default `NA`: no change) for the hindcast validation. Single mode records each rep-year (ignitions, escapes, area burned and fires of at least `escapeSizeHa` in the ELF core, from `fireSenseUtils::hindcastSimulated()`) every `hindcastInterval` and, at `end(sim)`, writes `hindcast_reps.csv`, `hindcast_sizes.csv`, `hindcast_observed.csv` (`fireSenseUtils::hindcastObserved()`), `hindcast_observedSizes.csv`, `hindcast_observedPolys.gpkg`, `hindcast_burnMap.tif` and `hindcast_burnID_rep<rep>.tif`. Rep-years may be decimal years (`rep = round((time - hindcastYear) / hindcastInterval) + 1`); the files are not named by `time(sim)`. Multi mode pools the replicate folders (parameter sets) into three `Plots()` figures: `hindcast_distributions`, `hindcast_sizes`, `hindcast_map`. New inputs `ignitionsAndEscapes`, `rasterToMatchELF`, `rstAnnualBurnID`; new parameters `escapeSizeHa`, `hindcastInterval`. Needs fireSenseUtils > 0.2.3.9091.
 
 # fireSense_summary 1.1.0
