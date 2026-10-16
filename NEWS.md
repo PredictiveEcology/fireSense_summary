@@ -2,6 +2,8 @@
 
 * The National Fire Database polygons are fetched and unzipped with `reproducible::prepInputs()` instead of `download.file()` and `archive::archive_extract()`, so the access is checked against `CHECKSUMS.txt` and appears in the download ledger (`urlLog(sim)`). The `archive` package is no longer needed.
 
+* The parameter `studyAreaName` is renamed `.studyAreaName`, the name every other fireSense and Biomass module uses. The old name is still accepted, with a warning, and used when `.studyAreaName` is `NA`. If both are `NA`, a hash of `rasterToMatch` is used, as other modules use a hash of `studyArea`. `reproducible` is added to `reqdPkgs`.
+
 * New parameter `hindcastYear` (default `NA`: no change) for the hindcast validation. Single mode records each rep-year (ignitions, escapes, area burned and fires of at least `escapeSizeHa` in the ELF core, from `fireSenseUtils::hindcastSimulated()`) every `hindcastInterval` and, at `end(sim)`, writes `hindcast_reps.csv`, `hindcast_sizes.csv`, `hindcast_observed.csv` (`fireSenseUtils::hindcastObserved()`), `hindcast_observedSizes.csv`, `hindcast_observedPolys.gpkg`, `hindcast_burnMap.tif` and `hindcast_burnID_rep<rep>.tif`. Rep-years may be decimal years (`rep = round((time - hindcastYear) / hindcastInterval) + 1`); the files are not named by `time(sim)`. Multi mode pools the replicate folders (parameter sets) into three `Plots()` figures: `hindcast_distributions`, `hindcast_sizes`, `hindcast_map`. New inputs `ignitionsAndEscapes`, `rasterToMatchELF`, `rstAnnualBurnID`; new parameters `escapeSizeHa`, `hindcastInterval`. Needs fireSenseUtils > 0.2.3.9091.
 
 # fireSense_summary 1.1.0

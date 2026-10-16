@@ -33,8 +33,9 @@ defineModule(sim, list(
                           "'multi': summarize the saved outputs of several replicates in figures.")),
     defineParameter("simOutputPath", "character", outputPath(sim), NA, NA,
                     desc = "Directory holding the replicate output directories, and where figures are written (multi mode)."),
-    defineParameter("studyAreaName", "character", NA, NA, NA,
-                    desc = "Study area name; used in figure paths and filenames (multi mode)."),
+    defineParameter(".studyAreaName", "character", NA, NA, NA,
+                    desc = paste("Human-readable name for the study area; used in figure paths and filenames (multi mode).",
+                                 "If `NA`, a hash of `rasterToMatch` will be used.")),
     defineParameter("reps", "integer", 1L:10L, 1, NA,
                     desc = paste("Replicate numbers to summarize (multi mode). Files are read with `mclapply`;",
                                  "set `options(mc.cores = )` to run in parallel.")),
@@ -106,6 +107,17 @@ doEvent.fireSense_summary = function(sim, eventTime, eventType) {
   switch(
     eventType,
     init = {
+      ## `studyAreaName` was renamed `.studyAreaName`; still honour the old name
+      oldStudyAreaName <- P(sim)$studyAreaName # nolint: param_used_undeclared
+      if (!is.null(oldStudyAreaName)) {
+        warning("fireSense_summary: the `studyAreaName` parameter is now `.studyAreaName`; ",
+                "please rename it.", call. = FALSE)
+        if (is.na(P(sim)$.studyAreaName))
+          P(sim)$.studyAreaName <- oldStudyAreaName
+      }
+      ## the module has no studyArea, so an unnamed study area is named after its template raster
+      if (is.na(P(sim)$.studyAreaName) && !is.null(sim$rasterToMatch))
+        P(sim)$.studyAreaName <- reproducible::.robustDigest(sim$rasterToMatch, algo = "xxhash64")
       if (P(sim)$mode == "single") {
         sim <- scheduleEvent(sim, end(sim), "fireSense_summary", "save_single", .last())
         if (!is.na(P(sim)$hindcastYear)) {
@@ -122,7 +134,7 @@ doEvent.fireSense_summary = function(sim, eventTime, eventType) {
 
         f_burnSummary_plot <- fireSenseUtils::plotBurnSummary(
           climateScenario = P(sim)$climateScenario,
-          studyAreaName = P(sim)$studyAreaName,
+          studyAreaName = P(sim)$.studyAreaName,
           outputDir = P(sim)$simOutputPath,
           Nreps = max(P(sim)$reps),
           years = P(sim)$years,
@@ -133,7 +145,7 @@ doEvent.fireSense_summary = function(sim, eventTime, eventType) {
 
         f_cumulBurn_plot <- fireSenseUtils::plotCumulativeBurns(
           climateScenario = P(sim)$climateScenario,
-          studyAreaName = P(sim)$studyAreaName,
+          studyAreaName = P(sim)$.studyAreaName,
           outputDir = P(sim)$simOutputPath,
           Nreps = max(P(sim)$reps),
           years = P(sim)$years,
@@ -144,7 +156,7 @@ doEvent.fireSense_summary = function(sim, eventTime, eventType) {
 
         f_historic_plot <- fireSenseUtils::plotHistoricFires(
           climateScenario = as.character(P(sim)$climateScenario),
-          studyAreaName = P(sim)$studyAreaName,
+          studyAreaName = P(sim)$.studyAreaName,
           outputDir = P(sim)$simOutputPath,
           pixelSize = unique(terra::res(sim$rasterToMatch)),
           firePolys = mod$firePolys,
@@ -260,7 +272,7 @@ hindcastFigures <- function(sim) {
   polys <- if (file.exists(polyFile)) terra::vect(polyFile)
   ## the burn maps count the rep-years in which a pixel burned; sum them over the parameter sets
   burn <- Reduce(`+`, lapply(dirs, function(d) terra::rast(file.path(d, hindcastFiles[["burnMap"]]))))
-  title <- paste(P(sim)$studyAreaName, P(sim)$hindcastYear)
+  title <- paste(P(sim)$.studyAreaName, P(sim)$hindcastYear)
   checkPath(figurePath(sim), create = TRUE)
   Plots(reps, fn = fireSenseUtils::plotHindcastDistributions, observed = obs, title = title,
         types = P(sim)$.plots, filename = "hindcast_distributions", path = figurePath(sim))

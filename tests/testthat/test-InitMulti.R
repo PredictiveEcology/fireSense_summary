@@ -31,7 +31,7 @@ makeMultiSim <- function(firePolys = toyFirePolys(), outputsDF = NULL, reps = 1L
     times = times,
     params = list(fireSense_summary = list(
       mode = "multi", reps = reps, simOutputPath = simOutputPath,
-      studyAreaName = "toySA", years = years
+      .studyAreaName = "toySA", years = years
     )),
     modules = "fireSense_summary",
     objects = objs,
