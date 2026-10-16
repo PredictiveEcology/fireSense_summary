@@ -38,7 +38,7 @@ test_that("parameters are the expected names", {
   md <- SpaDES.core::moduleMetadata(module = moduleName, path = modulePath)
   expect_identical(
     sort(md$parameters$paramName),
-    sort(c("climateScenario", "escapeSizeHa", "hindcastInterval", "hindcastYear", "mode", "reps",
+    sort(c(".neverCache", "climateScenario", "escapeSizeHa", "hindcastInterval", "hindcastYear", "mode", "reps",
            "simOutputPath", "studyAreaName", "years"))
   )
 })
@@ -57,7 +57,7 @@ test_that("parameter classes and defaults are as declared", {
   p <- md$parameters[order(md$parameters$paramName), ]
   expect_identical(
     stats::setNames(unlist(p$paramClass), p$paramName),
-    c(climateScenario = "character", escapeSizeHa = "numeric", hindcastInterval = "numeric",
+    c(.neverCache = "character", climateScenario = "character", escapeSizeHa = "numeric", hindcastInterval = "numeric",
       hindcastYear = "integer", mode = "character", reps = "integer",
       simOutputPath = "character", studyAreaName = "character", years = "integer")
   )
