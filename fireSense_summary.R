@@ -37,8 +37,8 @@ defineModule(sim, list(
     defineParameter("simOutputPath", "character", outputPath(sim), NA, NA,
                     desc = "Directory holding the replicate output directories, and where figures are written (multi mode)."),
     defineParameter(".studyAreaName", "character", NA, NA, NA,
-                    desc = paste("Study area name; used in figure paths and filenames (multi mode).",
-                                 "If `NA`, a hash of `rasterToMatch` is used.")),
+                    desc = paste("Human-readable name for the study area; used in figure paths and filenames (multi mode).",
+                                 "If `NA`, a hash of `rasterToMatch` will be used.")),
     defineParameter("reps", "integer", 1L:10L, 1, NA,
                     desc = paste("Replicate numbers to summarize (multi mode). Files are read with `mclapply`;",
                                  "set `options(mc.cores = )` to run in parallel.")),
@@ -110,6 +110,14 @@ doEvent.fireSense_summary = function(sim, eventTime, eventType) {
   switch(
     eventType,
     init = {
+      ## `studyAreaName` was renamed `.studyAreaName`; still honour the old name
+      oldStudyAreaName <- P(sim)$studyAreaName # nolint: param_used_undeclared
+      if (!is.null(oldStudyAreaName)) {
+        warning("fireSense_summary: the `studyAreaName` parameter is now `.studyAreaName`; ",
+                "please rename it.", call. = FALSE)
+        if (is.na(P(sim)$.studyAreaName))
+          P(sim)$.studyAreaName <- oldStudyAreaName
+      }
       ## the module has no studyArea, so an unnamed study area is named after its template raster
       if (is.na(P(sim)$.studyAreaName) && !is.null(sim$rasterToMatch))
         P(sim)$.studyAreaName <- reproducible::.robustDigest(sim$rasterToMatch, algo = "xxhash64")

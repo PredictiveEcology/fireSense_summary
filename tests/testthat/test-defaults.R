@@ -25,3 +25,10 @@ test_that("years default to the simulation's start and end", {
   years <- SpaDES.core::resolveSimYears(SpaDES.core::P(sim, module = moduleName)$years, sim)
   expect_equal(unname(years), c(2025, 2044))
 })
+
+test_that("the old studyAreaName still works, with a warning", {
+  expect_warning(
+    sim <- initOnly(list(fireSense_summary = list(studyAreaName = "Mackenzie"))),
+    "now `.studyAreaName`")
+  expect_identical(SpaDES.core::P(sim, module = moduleName)$.studyAreaName, "Mackenzie")
+})
