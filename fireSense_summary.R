@@ -21,7 +21,7 @@ defineModule(sim, list(
     "purrr", "qs2", "RColorBrewer", "reproducible", "terra", "tidyterra",
     "raster", "rasterVis", ## TODO: remove these once fireSenseUtils::plotCumulativeBurns switched to ggplot2/tidyterra
     "PredictiveEcology/fireSenseUtils@development (>= 0.2.3.9092)", ## hindcast*() (after plot*(simFiles =))
-    "PredictiveEcology/SpaDES.core@development (>= 3.2.1.9001)", ## dirnamesFromSet(), resolveSimYears(), padYears()
+    "PredictiveEcology/SpaDES.core@development (>= 3.2.1.9038)", ## dirnamesFromSet(leafOnly = FALSE) returns the rep folder, resolveSimYears(), padYears()
     "PredictiveEcology/SpaDES.tools@development (>= 2.1.1.9000)"
   ),
   parameters = rbind(
@@ -293,7 +293,24 @@ InitMulti <- function(sim) {
   ## check for necessary output files -----------------------------------------------
   ## NOTE: don't load simLists -- slow and unreliable
   mod$useOutputs <- NROW(sim$outputsDF) > 0
-  mod$allReps <- dirnamesFromSet(sim$outputsDF$file, P(sim)$reps)
+  ## without outputsDF, the files on disk say how the rep folders are padded (rep1 or rep01)
+  bmbPattern <- "burnMap|burnSummary"
+  filesOnDisk <- if (mod$useOutputs) {
+    sim$outputsDF$file
+  } else {
+    fs::dir_ls(
+      P(sim)$simOutputPath,
+      regexp = bmbPattern,
+      recurse = 1,
+      type = "file"
+    )
+  }
+  ## leafOnly = FALSE keeps the folder as written; the default rebuilds it unpadded
+  mod$allReps <- if (length(filesOnDisk) > 0) {
+    basename(dirnamesFromSet(filesOnDisk, P(sim)$reps, leafOnly = FALSE))
+  } else {
+    dirnamesFromSet(filesOnDisk, P(sim)$reps)
+  }
   ## assigned back: P(sim)$years is read downstream, not just for padding
   P(sim)$years <- resolveSimYears(P(sim)$years, sim)
   pad <- padYears(P(sim)$years)
@@ -303,8 +320,8 @@ InitMulti <- function(sim) {
   if (mod$useOutputs) {
     mod$bmbs <- grep(
       value = TRUE,
-      sim$outputsDF$file,
-      pattern = "burnMap|burnSummary"
+      filesOnDisk,
+      pattern = bmbPattern
     ) |>
       grep(paste0("(", paste0(mod$allReps, collapse = "|"), ")"), x = _, value = TRUE) |>
       grep("gri|png|txt|xml", x = _, value = TRUE, invert = TRUE)
@@ -313,14 +330,14 @@ InitMulti <- function(sim) {
     ## restored from another machine), so let the plotting functions use these paths
     mod$simFiles <- mod$bmbs
   } else {
-    mod$bmbs <- fs::dir_ls(
-      P(sim)$simOutputPath,
-      regexp = "burnMap|burnSummary",
-      recurse = 1,
-      type = "file"
-    ) |>
+    mod$bmbs <- filesOnDisk |>
       grep(paste0("(", paste0(P(sim)$reps, collapse = "|"), ")"), x = _, value = TRUE) |>
       grep(paste0("_year(", paste0(P(sim)$years, collapse = "|"), ")"), x = _, value = TRUE)
+
+    if (length(mod$allReps) < length(P(sim)$reps)) {
+      stop("replicate folders appear to be missing under ", P(sim)$simOutputPath,
+           ": found ", length(mod$allReps), " of ", length(P(sim)$reps))
+    }
 
     filesUserHas <- c(mod$bmbs)
 

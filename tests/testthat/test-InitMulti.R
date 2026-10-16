@@ -154,6 +154,18 @@ test_that("without outputsDF the simOutputPath is globbed, and missing files sto
   expect_match(err, "rep2/fireSense_burnSummary\\.csv", fixed = FALSE)
 })
 
+test_that("without outputsDF the replicate folders keep the padding found on disk", {
+  ## SpaDES.project experiments write rep01, not rep1; the expected files must be named as on disk.
+  out <- withr::local_tempdir()
+  dir.create(file.path(out, "rep01"))
+  file.create(file.path(out, "rep01", "burnMap_year2013.tif"))
+  s <- makeMultiSim(outputsDF = data.table::data.table(), reps = 1L,
+                    years = c(2011L, 2013L), simOutputPath = out)
+  err <- tryCatch(runInitMulti(s), error = function(e) conditionMessage(e))
+  expect_match(err, "rep01/fireSense_burnSummary\\.csv")
+  expect_false(grepl("rep1/", err, fixed = TRUE))
+})
+
 ## NOT TESTED, deliberately: the "files all present" success path of the glob
 ## branch. It appears to be unreachable. The `_year(...)` grep on line ~183 drops
 ## every path without `_year` in its name, which includes
