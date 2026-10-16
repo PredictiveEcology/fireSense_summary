@@ -166,16 +166,17 @@ test_that("without outputsDF the replicate folders keep the padding found on dis
   expect_false(grepl("rep1/", err, fixed = TRUE))
 })
 
-## NOT TESTED, deliberately: the "files all present" success path of the glob
-## branch. It appears to be unreachable. The `_year(...)` grep on line ~183 drops
-## every path without `_year` in its name, which includes
-## `fireSense_burnSummary.csv`, yet `filesExpected` below requires exactly that
-## file per replicate -- so `filesNeeded$exists` is FALSE for it even when the file
-## is there on disk, and InitMulti() stops. Confirmed by creating the four expected
-## files on disk and calling InitMulti(): it still reports the two .csv files
-## missing. This is pre-existing on `development` (same two greps, same
-## `filesExpected`), is not touched by this PR, and is not asserted here because
-## writing a test around it would enshrine it as correct behaviour.
+test_that("without outputsDF, InitMulti() succeeds when every expected file is on disk", {
+  ## The burn summary csv has no `_year` in its name; the year filter must not drop it.
+  out <- withr::local_tempdir()
+  dir.create(file.path(out, "rep01"))
+  file.create(file.path(out, "rep01", c("burnMap_year2013.tif", "fireSense_burnSummary.csv")))
+  s <- makeMultiSim(outputsDF = data.table::data.table(), reps = 1L,
+                    years = c(2011L, 2013L), simOutputPath = out)
+  m <- modOf(runInitMulti(s))
+  expect_identical(m$allReps, "rep01")
+  expect_identical(basename(m$bmbs), c("burnMap_year2013.tif", "fireSense_burnSummary.csv"))
+})
 
 test_that("without ignitionFirePoints they come from fireregimetools, not a hard-coded URL", {
   ## The module used to download `.../fire_pnt/current_version/NFDB_point.zip`, which now returns

@@ -305,12 +305,7 @@ InitMulti <- function(sim) {
       type = "file"
     )
   }
-  ## leafOnly = FALSE keeps the folder as written; the default rebuilds it unpadded
-  mod$allReps <- if (length(filesOnDisk) > 0) {
-    basename(dirnamesFromSet(filesOnDisk, P(sim)$reps, leafOnly = FALSE))
-  } else {
-    dirnamesFromSet(filesOnDisk, P(sim)$reps)
-  }
+  mod$allReps <- dirnamesFromSet(filesOnDisk, P(sim)$reps)
   ## assigned back: P(sim)$years is read downstream, not just for padding
   P(sim)$years <- resolveSimYears(P(sim)$years, sim)
   pad <- padYears(P(sim)$years)
@@ -330,9 +325,11 @@ InitMulti <- function(sim) {
     ## restored from another machine), so let the plotting functions use these paths
     mod$simFiles <- mod$bmbs
   } else {
-    mod$bmbs <- filesOnDisk |>
-      grep(paste0("(", paste0(P(sim)$reps, collapse = "|"), ")"), x = _, value = TRUE) |>
-      grep(paste0("_year(", paste0(P(sim)$years, collapse = "|"), ")"), x = _, value = TRUE)
+    inReps <- grepl(paste0("(", paste0(P(sim)$reps, collapse = "|"), ")"), filesOnDisk)
+    ## the year is in the burn map names only; the burn summary csv has none
+    inYears <- !grepl("burnMap", filesOnDisk) |
+      grepl(paste0("_year(", paste0(P(sim)$years, collapse = "|"), ")"), filesOnDisk)
+    mod$bmbs <- filesOnDisk[inReps & inYears]
 
     if (length(mod$allReps) < length(P(sim)$reps)) {
       stop("replicate folders appear to be missing under ", P(sim)$simOutputPath,
