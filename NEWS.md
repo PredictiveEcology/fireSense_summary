@@ -15,6 +15,8 @@
 - Requires SpaDES.core >= 3.2.1.9001, for `resolveSimYears()`.
 # fireSense_summary (development version)
 
+* Without `outputsDF`, `InitMulti()` takes the replicate folder names from the files found under `simOutputPath`, so `rep01` (as written by SpaDES.project experiments) is found as well as `rep1`. It used to expect `rep1` whatever was on disk. Needs SpaDES.core 3.2.1.9038 or later.
+
 * The National Fire Database polygons are fetched and unzipped with `reproducible::prepInputs()` instead of `download.file()` and `archive::archive_extract()`, so the access is checked against `CHECKSUMS.txt` and appears in the download ledger (`urlLog(sim)`). The `archive` package is no longer needed.
 
 - Fixed: All events (`init`, `save_single`, `hindcastRecord`, `hindcast`) are declared in the new `.neverCache` parameter, so they are never cached, even when `.useCache` (or `.globals`) is set. They read the run's output files and write maps, csv files and figures, which are not part of the event's cache key, and a cache hit writes nothing. Needs SpaDES.core >= 3.2.1.9037.
