@@ -16,6 +16,8 @@
 # fireSense_summary (development version)
 
 * Without `outputsDF`, `InitMulti()` takes the replicate folder names from the files found under `simOutputPath`, so `rep01` (as written by SpaDES.project experiments) is found as well as `rep1`. It used to expect `rep1` whatever was on disk. Needs SpaDES.core 3.2.1.9038 or later.
+* The hindcast also writes what the ignition-location test needs: per rep, `hindcast_ignitionProb_rep<rep>.tif` and `hindcast_escapeProb_rep<rep>.tif` (the two layers of `fireSense_IgAndEscapeProbRas`, on the ignition-fit grid), and `hindcast_observedPoints.gpkg`, the year's natural NFDB ignition points inside the core (from `fireSenseUtils::hindcastObserved()$points`). `fireSense_IgAndEscapeProbRas` is a new input and is required when `hindcastYear` is set. Needs fireSenseUtils with `hindcastObserved()$points` (PredictiveEcology/fireSenseUtils, "hindcast observed points").
+* `hindcast_reps.csv`: `year` is now the integer hindcast year (it held the rep time, e.g. 1991.001); the rep time moves to the new column `time`, and `rep` is unchanged. Readers that used `year` as the rep time should read `time`.
 
 * The National Fire Database polygons are fetched and unzipped with `reproducible::prepInputs()` instead of `download.file()` and `archive::archive_extract()`, so the access is checked against `CHECKSUMS.txt` and appears in the download ledger (`urlLog(sim)`). The `archive` package is no longer needed.
 

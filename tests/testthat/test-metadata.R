@@ -20,6 +20,7 @@ test_that("inputs are the expected names and classes", {
     c(burnMap            = "SpatRaster",
       burnSummary        = "data.table",
       firePolys          = "list",
+      fireSense_IgAndEscapeProbRas = "SpatRaster",
       ignitionFirePoints = "SpatVector",
       ignitionsAndEscapes = "data.table",
       outputsDF          = "data.table",

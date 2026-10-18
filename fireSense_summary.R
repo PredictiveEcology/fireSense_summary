@@ -9,7 +9,7 @@ defineModule(sim, list(
     person("Ian MS", "Eddy", email = "ian.eddy@nrcan-rncan.gc.ca", role = "aut")
   ),
   childModules = character(0),
-  version = list(fireSense_summary = "1.1.0.9002"),
+  version = list(fireSense_summary = "1.1.0.9003"),
   timeframe = as.POSIXlt(c(NA, NA)),
   timeunit = "year",
   citation = list("citation.bib"),
@@ -20,7 +20,7 @@ defineModule(sim, list(
     "FOR-CAST/fireregimetools@main (>= 0.1.0.9001)", ## fetch_nfdb_points()
     "purrr", "qs2", "RColorBrewer", "reproducible", "terra", "tidyterra",
     "raster", "rasterVis", ## TODO: remove these once fireSenseUtils::plotCumulativeBurns switched to ggplot2/tidyterra
-    "PredictiveEcology/fireSenseUtils@development (>= 0.2.3.9092)", ## hindcast*() (after plot*(simFiles =))
+    "PredictiveEcology/fireSenseUtils@development (>= 0.2.3.9105)", ## hindcast*() (after plot*(simFiles =)); hindcastObserved()$points
     "PredictiveEcology/SpaDES.core@development (>= 3.2.1.9038)", ## dirnamesFromSet(leafOnly = FALSE) returns the rep folder, resolveSimYears(), padYears()
     "PredictiveEcology/SpaDES.tools@development (>= 2.1.1.9000)"
   ),
@@ -52,8 +52,9 @@ defineModule(sim, list(
                     desc = paste("Hindcast validation: the observed year the simulated rep-years are compared with.",
                                  "`NA` (default): no hindcast. Single mode records each rep-year and, at `end(sim)`,",
                                  "writes `hindcast_reps.csv`, `hindcast_sizes.csv`, `hindcast_observed.csv`,",
-                                 "`hindcast_observedSizes.csv`, `hindcast_observedPolys.gpkg`, `hindcast_burnMap.tif` and one",
-                                 "`hindcast_burnID_rep<rep>.tif` per rep. Multi mode pools the replicate folders",
+                                 "`hindcast_observedSizes.csv`, `hindcast_observedPolys.gpkg`, `hindcast_observedPoints.gpkg`,",
+                                 "`hindcast_burnMap.tif` and, per rep, `hindcast_burnID_rep<rep>.tif`,",
+                                 "`hindcast_ignitionProb_rep<rep>.tif` and `hindcast_escapeProb_rep<rep>.tif`. Multi mode pools the replicate folders",
                                  "(parameter sets) in hindcast figures instead of the usual multi-mode figures.")),
     defineParameter("years", "integer", c(NA_integer_, NA_integer_), NA, NA,
                     desc = paste("Which two simulation years should be compared?",
@@ -76,6 +77,9 @@ defineModule(sim, list(
     expectsInput("ignitionsAndEscapes", "data.table", sourceURL = NA,
                  paste("Optional; hindcast (single mode). This year's ignitions (`pixelID`, `escaped`) from",
                        "`fireSense_ignitionPredict`.")),
+    expectsInput("fireSense_IgAndEscapeProbRas", "SpatRaster", sourceURL = NA,
+                 paste("Optional; hindcast (single mode). This year's layers `ignitionProb` and `escapeProb` from",
+                       "`fireSense_ignitionPredict`, written for every rep.")),
     expectsInput("rasterToMatchELF", "SpatRaster", sourceURL = NA,
                  "Optional; hindcast (single mode). The ELF core; the simulation and the observations are clipped to it."),
     expectsInput("rstAnnualBurnID", "SpatRaster", sourceURL = NA,
@@ -198,19 +202,26 @@ doEvent.fireSense_summary = function(sim, eventTime, eventType) {
 #' One definition for the names used by `hindcastSave()` and `hindcastFigures()`.
 hindcastFiles <- c(reps = "hindcast_reps.csv", sizes = "hindcast_sizes.csv", observed = "hindcast_observed.csv",
                    observedSizes = "hindcast_observedSizes.csv", observedPolys = "hindcast_observedPolys.gpkg",
-                   burnMap = "hindcast_burnMap.tif")
+                   observedPoints = "hindcast_observedPoints.gpkg", burnMap = "hindcast_burnMap.tif")
+
+#' The per-rep maps the hindcast writes
+#'
+#' The layers of `fireSense_IgAndEscapeProbRas` that `hindcastRecord()` writes, one file per rep each.
+hindcastRepMaps <- c("ignitionProb", "escapeProb")
 
 #' Record one simulated rep-year (hindcast, single mode)
 #'
 #' Called each `hindcastInterval` after `fireSense_burn`. Counts this year's ignitions, escapes, area burned and
-#' fires in the ELF core (`fireSenseUtils::hindcastSimulated()`) and writes the year's fire-ID raster.
+#' fires in the ELF core (`fireSenseUtils::hindcastSimulated()`) and writes the year's fire-ID raster and the
+#' ignition and escape probability maps used.
 #' Times need not be whole years: `rep = round((time - hindcastYear) / hindcastInterval) + 1`.
 #'
 #' @param sim A `simList`.
 #'
 #' @return The `simList`, invisibly, with `mod$hindcastReps` and `mod$hindcastSizes` extended.
 hindcastRecord <- function(sim) {
-  needed <- c("rasterToMatchELF", "rstAnnualBurnID", "ignitionsAndEscapes", "ignitionFirePoints", "firePolys")
+  needed <- c("rasterToMatchELF", "rstAnnualBurnID", "ignitionsAndEscapes", "fireSense_IgAndEscapeProbRas",
+              "ignitionFirePoints", "firePolys")
   missing <- needed[vapply(needed, function(o) is.null(sim[[o]]), logical(1))]
   if (length(missing))
     stop("hindcastYear is set, so fireSense_summary needs: ", paste(missing, collapse = ", "))
@@ -218,19 +229,24 @@ hindcastRecord <- function(sim) {
   one <- fireSenseUtils::hindcastSimulated(sim$rstAnnualBurnID, sim$rasterToMatchELF,
                                            sim$ignitionsAndEscapes, P(sim)$escapeSizeHa)
   mod$hindcastReps <- data.table::rbindlist(list(
-    mod$hindcastReps, cbind(data.table::data.table(rep = repNo, year = time(sim)), one$counts)))
+    mod$hindcastReps, cbind(data.table::data.table(rep = repNo, year = as.integer(floor(time(sim) + 1e-9)),
+                                                   time = time(sim)), one$counts)))
   mod$hindcastSizes <- data.table::rbindlist(list(
     mod$hindcastSizes, cbind(data.table::data.table(rep = repNo)[rep(1L, NROW(one$sizes))], one$sizes)))
   f <- file.path(outputPath(sim), sprintf("hindcast_burnID_rep%02d.tif", repNo))
   terra::writeRaster(sim$rstAnnualBurnID, f, datatype = "INT4S", overwrite = TRUE)
-  registerOutputs(f, sim)
+  ## each rep draws its own climate, so the probability maps differ by rep
+  maps <- file.path(outputPath(sim), sprintf("hindcast_%s_rep%02d.tif", hindcastRepMaps, repNo))
+  Map(function(layer, file) terra::writeRaster(sim$fireSense_IgAndEscapeProbRas[[layer]], file, overwrite = TRUE),
+      hindcastRepMaps, maps)
+  registerOutputs(c(f, maps), sim)
 }
 
 #' Write the hindcast tables and the observed year (hindcast, single mode)
 #'
 #' At `end(sim)`: the per-rep rows and fire sizes recorded by `hindcastRecord()`, and the observed ignitions,
-#' escapes, area burned (natural-cause and all-cause) and fire sizes of `hindcastYear` in the ELF core from
-#' `fireSenseUtils::hindcastObserved()`.
+#' escapes, area burned (natural-cause and all-cause), fire sizes and natural ignition points of `hindcastYear`
+#' in the ELF core from `fireSenseUtils::hindcastObserved()`.
 #'
 #' @param sim A `simList`.
 #'
@@ -245,6 +261,10 @@ hindcastSave <- function(sim) {
   if (!is.null(obs$polys) && NROW(obs$polys)) {
     files <- c(files, file.path(outputPath(sim), hindcastFiles[["observedPolys"]]))
     terra::writeVector(obs$polys, files[[length(files)]], overwrite = TRUE)
+  }
+  if (!is.null(obs$points) && NROW(obs$points)) {
+    files <- c(files, file.path(outputPath(sim), hindcastFiles[["observedPoints"]]))
+    terra::writeVector(obs$points, files[[length(files)]], overwrite = TRUE)
   }
   ## named for the hindcast, not time(sim), which is a decimal year here
   files <- c(files, file.path(outputPath(sim), hindcastFiles[["burnMap"]]))

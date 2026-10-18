@@ -6,6 +6,14 @@ toyHindcastCore <- function() {
   terra::setValues(r, ifelse(terra::colFromCell(r, seq_len(terra::ncell(r))) <= 5, 2, NA))
 }
 
+## the coarse (5 x 5, 2 km) grid of the ignition fit, not the burn grid
+toyIgAndEscapeProb <- function() {
+  r <- terra::rast(nrows = 5, ncols = 5, xmin = 0, xmax = 10000, ymin = 0, ymax = 10000, crs = "EPSG:3978")
+  ig <- terra::setValues(r, seq_len(25) / 100)
+  es <- terra::setValues(r, seq_len(25) / 1000)
+  stats::setNames(c(ig, es), c("ignitionProb", "escapeProb"))
+}
+
 toyHindcastObjects <- function() {
   core <- toyHindcastCore()
   id <- terra::setValues(terra::rast(core), NA_integer_)
@@ -17,6 +25,7 @@ toyHindcastObjects <- function() {
   poly$YEAR <- 2000L; poly$FIRECAUS <- "Natural"
   list(rasterToMatchELF = core, rstAnnualBurnID = id,
        ignitionsAndEscapes = data.table::data.table(pixelID = c(1L, 2L, 6L), escaped = c(TRUE, FALSE, TRUE)),
+       fireSense_IgAndEscapeProbRas = toyIgAndEscapeProb(),
        burnMap = terra::setValues(terra::rast(core), 1L), burnSummary = toyBurnSummary(),
        ignitionFirePoints = pts, firePolys = list(year2000 = poly))
 }
@@ -39,7 +48,9 @@ test_that("hindcast single mode records ten decimal-year reps and the observed y
 
   reps <- data.table::fread(file.path(out, "hindcast_reps.csv"))
   expect_identical(reps$rep, 1:10)
-  expect_equal(reps$year, 2000 + (0:9) / 1000)
+  expect_type(reps$year, "integer")
+  expect_true(all(reps$year == 2000L))                     # the hindcast year, not the rep time
+  expect_equal(reps$time, 2000 + (0:9) / 1000)             # the rep time is kept for readers that used it
   expect_true(all(reps$ignitions == 2L))                   # pixels 1 and 2 are in the core, 6 is not
   expect_true(all(reps$escapes == 1L))
   expect_true(all(reps$areaBurnedHa == 300))
@@ -61,6 +72,31 @@ test_that("hindcast single mode records ten decimal-year reps and the observed y
                   sprintf("hindcast_burnID_rep%02d.tif", 1:10))
 })
 
+test_that("hindcast writes each rep's ignition and escape probability maps on the ignition grid", {
+  s <- makeHindcastSim()
+  out <- SpaDES.core::outputPath(s)
+  SpaDES.core::spades(s, debug = FALSE)
+  for (f in c("ignitionProb", "escapeProb")) {
+    files <- sprintf("hindcast_%s_rep%02d.tif", f, 1:10)
+    expect_setequal(grep(paste0("hindcast_", f, "_rep"), list.files(out), value = TRUE), files)
+    r <- terra::rast(file.path(out, files[[3]]))
+    expected <- toyIgAndEscapeProb()[[f]]
+    expect_equal(terra::values(r, mat = FALSE), terra::values(expected, mat = FALSE))
+    expect_true(terra::compareGeom(r, expected, stopOnError = FALSE))
+    expect_identical(terra::crs(r), terra::crs(expected))
+  }
+})
+
+test_that("hindcast writes the year's observed natural ignition points in the core", {
+  s <- makeHindcastSim()
+  out <- SpaDES.core::outputPath(s)
+  SpaDES.core::spades(s, debug = FALSE)
+  pts <- terra::vect(file.path(out, "hindcast_observedPoints.gpkg"))
+  expect_equal(NROW(pts), 2)                          # the two natural points in the core, as ignitions
+  expect_true(all(pts$YEAR == 2000L & pts$CAUSE %in% c("L", "N")))
+  expect_identical(terra::crs(pts), terra::crs(toyHindcastCore()))
+})
+
 test_that("hindcast events are scheduled only when hindcastYear is set", {
   s <- makeHindcastSim(hindcastYear = NA_integer_)
   s <- s$.mods$fireSense_summary$doEvent.fireSense_summary(s, SpaDES.core::start(s), "init")
@@ -77,6 +113,12 @@ test_that("hindcast stops at the first rep-year when an input is missing", {
   s <- makeHindcastSim()
   s$firePolys <- NULL
   expect_error(SpaDES.core::spades(s, debug = FALSE), "firePolys")
+})
+
+test_that("hindcast stops when the ignition probability maps are missing", {
+  s <- makeHindcastSim()
+  s$fireSense_IgAndEscapeProbRas <- NULL
+  expect_error(SpaDES.core::spades(s, debug = FALSE), "fireSense_IgAndEscapeProbRas")
 })
 
 test_that("hindcast stops when ignitionsAndEscapes is missing, rather than counting NA ignitions", {
