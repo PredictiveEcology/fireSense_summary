@@ -17,7 +17,8 @@ test_that("inputs are the expected names and classes", {
   inputs <- stats::setNames(md$inputObjects$objectClass, md$inputObjects$objectName)
   expect_identical(
     inputs[order(names(inputs))],
-    c(burnMap            = "SpatRaster",
+    c(.ELFind            = "character",
+      burnMap            = "SpatRaster",
       burnSummary        = "data.table",
       firePolys          = "list",
       fireSense_IgAndEscapeProbRas = "SpatRaster",
@@ -39,7 +40,7 @@ test_that("parameters are the expected names", {
   md <- SpaDES.core::moduleMetadata(module = moduleName, path = modulePath)
   expect_identical(
     sort(md$parameters$paramName),
-    sort(c("climateScenario", "escapeSizeHa", "hindcastInterval", "hindcastYear", "mode", "reps",
+    sort(c(".runName", "climateScenario", "escapeSizeHa", "hindcastInterval", "hindcastYear", "mode", "reps",
            "simOutputPath", "studyAreaName", "years"))
   )
 })
@@ -58,7 +59,7 @@ test_that("parameter classes and defaults are as declared", {
   p <- md$parameters[order(md$parameters$paramName), ]
   expect_identical(
     stats::setNames(unlist(p$paramClass), p$paramName),
-    c(climateScenario = "character", escapeSizeHa = "numeric", hindcastInterval = "numeric",
+    c(.runName = "character", climateScenario = "character", escapeSizeHa = "numeric", hindcastInterval = "numeric",
       hindcastYear = "integer", mode = "character", reps = "integer",
       simOutputPath = "character", studyAreaName = "character", years = "integer")
   )
@@ -73,6 +74,7 @@ test_that("parameter classes and defaults are as declared", {
   expect_true(is.na(dflt$hindcastYear))
   expect_identical(dflt$hindcastInterval, 1)
   expect_true(is.na(dflt$studyAreaName))
+  expect_true(is.na(dflt$.runName))
 })
 
 test_that("the module declares the functions the tests reach for", {
