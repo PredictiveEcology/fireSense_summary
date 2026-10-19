@@ -1,5 +1,6 @@
 # fireSense_summary (development version)
 
+* Single mode writes one metrics row per run, `ELFmetrics_<.runName>.csv`, for the national map (`fireSenseUtils::readELFmetrics()`, `plotELFs(metrics =)`). It names the run, the ELF and the spread and ignition ledger files the run's fits came from, then fires and area burned per year, or for a hindcast the mean of its rep-years and the observed year. New parameter `.runName` and optional input `.ELFind`. Needs fireSenseUtils with `ELFmetricsFilename()`.
 * The hindcast also writes what the ignition-location test needs: per rep, `hindcast_ignitionProb_rep<rep>.tif` and `hindcast_escapeProb_rep<rep>.tif` (the two layers of `fireSense_IgAndEscapeProbRas`, on the ignition-fit grid), and `hindcast_observedPoints.gpkg`, the year's natural NFDB ignition points inside the core (from `fireSenseUtils::hindcastObserved()$points`). `fireSense_IgAndEscapeProbRas` is a new input and is required when `hindcastYear` is set. Needs fireSenseUtils with `hindcastObserved()$points` (PredictiveEcology/fireSenseUtils, "hindcast observed points").
 * `hindcast_reps.csv`: `year` is now the integer hindcast year (it held the rep time, e.g. 1991.001); the rep time moves to the new column `time`, and `rep` is unchanged. Readers that used `year` as the rep time should read `time`.
 

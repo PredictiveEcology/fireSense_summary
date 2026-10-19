@@ -20,7 +20,7 @@ defineModule(sim, list(
     "FOR-CAST/fireregimetools@main (>= 0.1.0.9001)", ## fetch_nfdb_points()
     "purrr", "qs2", "RColorBrewer", "reproducible", "terra", "tidyterra",
     "raster", "rasterVis", ## TODO: remove these once fireSenseUtils::plotCumulativeBurns switched to ggplot2/tidyterra
-    "PredictiveEcology/fireSenseUtils@development (>= 0.2.3.9105)", ## hindcast*() (after plot*(simFiles =)); hindcastObserved()$points
+    "PredictiveEcology/fireSenseUtils@development (>= 0.2.3.9110)", ## ELFmetricsFilename()
     "PredictiveEcology/SpaDES.core@development (>= 3.2.1.9001)", ## dirnamesFromSet(), resolveSimYears(), padYears()
     "PredictiveEcology/SpaDES.tools@development (>= 2.1.1.9000)"
   ),
@@ -33,6 +33,9 @@ defineModule(sim, list(
                           "'multi': summarize the saved outputs of several replicates in figures.")),
     defineParameter("simOutputPath", "character", outputPath(sim), NA, NA,
                     desc = "Directory holding the replicate output directories, and where figures are written (multi mode)."),
+    defineParameter(".runName", "character", NA_character_, NA, NA,
+                    desc = paste("Name of this run, e.g. '13.1_NRV_370_1'; names its metrics file",
+                                 "(`fireSenseUtils::ELFmetricsFilename()`). `NA`: the name of `outputPath(sim)`.")),
     defineParameter("studyAreaName", "character", NA, NA, NA,
                     desc = "Study area name; used in figure paths and filenames (multi mode)."),
     defineParameter("reps", "integer", 1L:10L, 1, NA,
@@ -84,6 +87,8 @@ defineModule(sim, list(
                  desc = paste("Optional; multi mode. `outputs(sim)` of all replicates, row-bound. Its `file` column",
                               "locates the burn maps and summaries. If missing, `simOutputPath` is searched."),
                  sourceURL = NA),
+    expectsInput(".ELFind", "character", sourceURL = NA,
+                 "Optional; single mode. The ELF of this run, recorded in its metrics row."),
     expectsInput("rasterToMatch", "SpatRaster",
                  "Template raster of the simulations. Required in multi mode.",
                  sourceURL = NA)
@@ -168,6 +173,9 @@ doEvent.fireSense_summary = function(sim, eventTime, eventType) {
       f_burnSummary <- file.path(outputPath(sim), "fireSense_burnSummary.csv")
       data.table::fwrite(sim$burnSummary, file = f_burnSummary)
       sim <- registerOutputs(f_burnSummary, sim)
+      ## a hindcast writes its metrics in hindcastSave(), after its last rep-year
+      if (is.na(P(sim)$hindcastYear))
+        sim <- writeRunMetrics(sim)
     },
     hindcastRecord = {
       sim <- hindcastRecord(sim)
@@ -254,7 +262,72 @@ hindcastSave <- function(sim) {
   ## named for the hindcast, not time(sim), which is a decimal year here
   files <- c(files, file.path(outputPath(sim), hindcastFiles[["burnMap"]]))
   terra::writeRaster(sim$burnMap, files[[length(files)]], datatype = "INT2U", overwrite = TRUE)
-  registerOutputs(files, sim)
+  sim <- registerOutputs(files, sim)
+  writeRunMetrics(sim, observed = obs$counts)
+}
+
+#' Write this run's metrics row (single mode)
+#'
+#' One row, written at `end(sim)` to `fireSenseUtils::ELFmetricsFilename(.runName)` in `outputPath(sim)`, for the
+#' national map: `fireSenseUtils::readELFmetrics()` collects the runs' rows and `fireSenseUtils::plotELFs(metrics =)`
+#' maps them. The row names the run (`runName`), the ELF (`sim$.ELFind`) and the spread and ignition ledger files
+#' whose fits the run used, so the reader can drop runs made with older fits; then the metrics. A hindcast gives
+#' the mean of its rep-years (`sim_*`, from `hindcastRecord()`) and the observed year (`obs_*`); any other run its
+#' fires and area burned (`burnSummary`, buffer included) per year `fireSense_burn` burned.
+#'
+#' @param sim A `simList`.
+#' @param observed Hindcast only: `counts` of `fireSenseUtils::hindcastObserved()`.
+#'
+#' @return The `simList`, invisibly, with the file registered in `outputs(sim)`.
+writeRunMetrics <- function(sim, observed = NULL) {
+  runName <- P(sim)$.runName
+  if (is.na(runName)) runName <- basename(outputPath(sim))
+  ledgers <- fitLedgerFiles(sim)
+  row <- data.table::data.table(runName = runName, ELF = if (is.null(sim$.ELFind)) NA_character_ else sim$.ELFind,
+                                spreadFitFile = ledgers[["spread"]], ignitionFitFile = ledgers[["ignition"]])
+  if (is.null(observed)) {
+    burn <- params(sim)$fireSense_burn
+    burnYears <- if (is.null(burn)) NA_integer_ else
+      length(seq(burn$.runInitialTime, end(sim), by = burn$.runInterval))
+    row[, `:=`(burnYears = burnYears, firesPerYear = NROW(sim$burnSummary) / burnYears,
+               areaBurnedHaPerYear = sum(sim$burnSummary$areaBurnedHa) / burnYears)]
+  } else {
+    cols <- c("ignitions", "escapes", "areaBurnedHa", "nFires50")
+    simulated <- mod$hindcastReps[, lapply(.SD, mean), .SDcols = cols]
+    obsCols <- setdiff(names(observed), "year")
+    row[, `:=`(hindcastYear = P(sim)$hindcastYear, reps = NROW(mod$hindcastReps))]
+    row[, paste0("sim_", cols) := simulated]
+    row[, paste0("obs_", obsCols) := observed[, obsCols, with = FALSE]]
+  }
+  f <- file.path(outputPath(sim), fireSenseUtils::ELFmetricsFilename(runName))
+  data.table::fwrite(row, f)
+  registerOutputs(f, sim)
+}
+
+#' The spread and ignition ledger files whose fits this run used
+#'
+#' The fit modules' `spreadFitFilename` and `ignitionFitFilename`; `"latest"` is the file a fit over `fireYears`
+#' with `fitFileSuffix` is written to (`fireSenseUtils::spreadFitFilenameFor()`, `ignitionFitFilenameFor()`). This
+#' module has none of these parameters, so they are read from the other modules, which check that they agree.
+#'
+#' @param sim A `simList`.
+#'
+#' @return A named character vector, `spread` and `ignition`; `NA` where no module has the parameter.
+fitLedgerFiles <- function(sim) {
+  fromOthers <- function(name) {
+    v <- unique(Filter(Negate(is.null), lapply(params(sim), `[[`, name)))
+    if (length(v)) v[[1]]
+  }
+  fireYears <- fromOthers("fireYears")
+  suffix <- fromOthers("fitFileSuffix")
+  if (is.null(suffix)) suffix <- ""
+  resolve <- function(file, filenameFor) {
+    if (is.null(file)) return(NA_character_)
+    if (!identical(file, "latest")) return(file)
+    if (is.null(fireYears)) NA_character_ else filenameFor(fireYears, suffix)
+  }
+  c(spread = resolve(fromOthers("spreadFitFilename"), fireSenseUtils::spreadFitFilenameFor),
+    ignition = resolve(fromOthers("ignitionFitFilename"), fireSenseUtils::ignitionFitFilenameFor))
 }
 
 #' Hindcast figures, pooling the replicate folders (multi mode)
