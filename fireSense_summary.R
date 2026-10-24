@@ -186,7 +186,9 @@ doEvent.fireSense_summary = function(sim, eventTime, eventType) {
       sim <- registerOutputs(f_burnMap, sim)
 
       f_burnSummary <- file.path(outputPath(sim), "fireSense_burnSummary.csv")
-      data.table::fwrite(sim$burnSummary, file = f_burnSummary)
+      ## fireSense_burn leaves burnSummary NULL in a run without fire; the file is still written (empty),
+      ## because the multi-mode summary expects one per run
+      data.table::fwrite(sim$burnSummary %||% data.table::data.table(), file = f_burnSummary)
       sim <- registerOutputs(f_burnSummary, sim)
       ## a hindcast writes its metrics in hindcastSave(), after its last rep-year
       if (is.na(P(sim)$hindcastYear))
