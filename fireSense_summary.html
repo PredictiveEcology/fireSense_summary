@@ -1928,13 +1928,21 @@ simulation and the observations are clipped to it.</td>
 <td align="left">NA</td>
 </tr>
 <tr class="even">
+<td align="left">flammableRTM</td>
+<td align="left">SpatRaster</td>
+<td align="left">Optional; hindcast (single mode). The pixels the
+simulation can burn (from <code>fireSense_burn</code>); the observed
+area burned and fire sizes are counted on them.</td>
+<td align="left">NA</td>
+</tr>
+<tr class="odd">
 <td align="left">rstAnnualBurnID</td>
 <td align="left">SpatRaster</td>
 <td align="left">Optional; hindcast (single mode). This year’s fire IDs
 from <code>fireSense_burn</code>.</td>
 <td align="left">NA</td>
 </tr>
-<tr class="odd">
+<tr class="even">
 <td align="left">fireSense_SpreadParamSet</td>
 <td align="left">integer</td>
 <td align="left">Optional; hindcast (single mode). The row of the fitted
@@ -1944,7 +1952,7 @@ parameter sets this year’s spread prediction used, from
 absent or, with several ELFs, not one number).</td>
 <td align="left">NA</td>
 </tr>
-<tr class="even">
+<tr class="odd">
 <td align="left">outputsDF</td>
 <td align="left">data.table</td>
 <td align="left">Optional; multi mode. <code>outputs(sim)</code> of all
@@ -1953,14 +1961,14 @@ maps and summaries. If missing, <code>simOutputPath</code> is
 searched.</td>
 <td align="left">NA</td>
 </tr>
-<tr class="odd">
+<tr class="even">
 <td align="left">.ELFind</td>
 <td align="left">character</td>
 <td align="left">Optional; single mode. The ELF of this run, recorded in
 its metrics row.</td>
 <td align="left">NA</td>
 </tr>
-<tr class="even">
+<tr class="odd">
 <td align="left">rasterToMatch</td>
 <td align="left">SpatRaster</td>
 <td align="left">Template raster of the simulations. Required in multi
