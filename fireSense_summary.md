@@ -1,7 +1,7 @@
 ---
 title: "fireSense_summary"
 author: "Alex Chubaty"
-date: "26 October 2026"
+date: "27 October 2026"
 output:
   html_document:
     df_print: paged
@@ -83,19 +83,20 @@ Single mode only; see `save_single`.
 ## Input data
 
 
-|objectName                   |objectClass |desc                                                                                                                                                               |sourceURL |
-|:----------------------------|:-----------|:------------------------------------------------------------------------------------------------------------------------------------------------------------------|:---------|
-|burnMap                      |SpatRaster  |Cumulative burn map from `fireSense_burn`. Required in single mode.                                                                                                |NA        |
-|burnSummary                  |data.table  |Fire summary table from `fireSense_burn`. Required in single mode.                                                                                                 |NA        |
-|firePolys                    |list        |Optional; multi mode. List of annual historical fire polygons. If missing, the NFDB polygons are downloaded.                                                       |NA        |
-|ignitionFirePoints           |SpatVector  |Optional; multi mode. Historical fire ignition points. If missing, the NFDB points are downloaded.                                                                 |NA        |
-|ignitionsAndEscapes          |data.table  |Optional; hindcast (single mode). This year's ignitions (`pixelID`, `escaped`) from `fireSense_ignitionPredict`.                                                   |NA        |
-|fireSense_IgAndEscapeProbRas |SpatRaster  |Optional; hindcast (single mode). This year's layers `ignitionProb` and `escapeProb` from `fireSense_ignitionPredict`, written for every rep.                      |NA        |
-|rasterToMatchELF             |SpatRaster  |Optional; hindcast (single mode). The ELF core; the simulation and the observations are clipped to it.                                                             |NA        |
-|rstAnnualBurnID              |SpatRaster  |Optional; hindcast (single mode). This year's fire IDs from `fireSense_burn`.                                                                                      |NA        |
-|outputsDF                    |data.table  |Optional; multi mode. `outputs(sim)` of all replicates, row-bound. Its `file` column locates the burn maps and summaries. If missing, `simOutputPath` is searched. |NA        |
-|.ELFind                      |character   |Optional; single mode. The ELF of this run, recorded in its metrics row.                                                                                           |NA        |
-|rasterToMatch                |SpatRaster  |Template raster of the simulations. Required in multi mode.                                                                                                        |NA        |
+|objectName                   |objectClass |desc                                                                                                                                                                                                                                                       |sourceURL |
+|:----------------------------|:-----------|:----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|:---------|
+|burnMap                      |SpatRaster  |Cumulative burn map from `fireSense_burn`. Required in single mode.                                                                                                                                                                                        |NA        |
+|burnSummary                  |data.table  |Fire summary table from `fireSense_burn`. Required in single mode.                                                                                                                                                                                         |NA        |
+|firePolys                    |list        |Optional; multi mode. List of annual historical fire polygons. If missing, the NFDB polygons are downloaded.                                                                                                                                               |NA        |
+|ignitionFirePoints           |SpatVector  |Optional; multi mode. Historical fire ignition points. If missing, the NFDB points are downloaded.                                                                                                                                                         |NA        |
+|ignitionsAndEscapes          |data.table  |Optional; hindcast (single mode). This year's ignitions (`pixelID`, `escaped`) from `fireSense_ignitionPredict`.                                                                                                                                           |NA        |
+|fireSense_IgAndEscapeProbRas |SpatRaster  |Optional; hindcast (single mode). This year's layers `ignitionProb` and `escapeProb` from `fireSense_ignitionPredict`, written for every rep.                                                                                                              |NA        |
+|rasterToMatchELF             |SpatRaster  |Optional; hindcast (single mode). The ELF core; the simulation and the observations are clipped to it.                                                                                                                                                     |NA        |
+|rstAnnualBurnID              |SpatRaster  |Optional; hindcast (single mode). This year's fire IDs from `fireSense_burn`.                                                                                                                                                                              |NA        |
+|fireSense_SpreadParamSet     |integer     |Optional; hindcast (single mode). The row of the fitted parameter sets this year's spread prediction used, from `fireSense_spreadPredict`; written as the `paramSet` column of the hindcast tables (`NA` if absent or, with several ELFs, not one number). |NA        |
+|outputsDF                    |data.table  |Optional; multi mode. `outputs(sim)` of all replicates, row-bound. Its `file` column locates the burn maps and summaries. If missing, `simOutputPath` is searched.                                                                                         |NA        |
+|.ELFind                      |character   |Optional; single mode. The ELF of this run, recorded in its metrics row.                                                                                                                                                                                   |NA        |
+|rasterToMatch                |SpatRaster  |Template raster of the simulations. Required in multi mode.                                                                                                                                                                                                |NA        |
 
 ## Output data
 

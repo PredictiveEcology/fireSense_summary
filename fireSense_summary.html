@@ -11,7 +11,7 @@
 
 <meta name="author" content="Alex Chubaty" />
 
-<meta name="date" content="2026-10-26" />
+<meta name="date" content="2026-10-27" />
 
 <title>fireSense_summary</title>
 
@@ -1623,7 +1623,7 @@ display: none;
 
 <h1 class="title toc-ignore">fireSense_summary</h1>
 <h4 class="author">Alex Chubaty</h4>
-<h4 class="date">26 October 2026</h4>
+<h4 class="date">27 October 2026</h4>
 
 </div>
 
@@ -1862,10 +1862,10 @@ historical ignitions, escapes and area burned.</p>
 <h2>Input data</h2>
 <table>
 <colgroup>
-<col width="13%" />
-<col width="5%" />
-<col width="76%" />
-<col width="4%" />
+<col width="9%" />
+<col width="3%" />
+<col width="83%" />
+<col width="3%" />
 </colgroup>
 <thead>
 <tr class="header">
@@ -1935,6 +1935,16 @@ from <code>fireSense_burn</code>.</td>
 <td align="left">NA</td>
 </tr>
 <tr class="odd">
+<td align="left">fireSense_SpreadParamSet</td>
+<td align="left">integer</td>
+<td align="left">Optional; hindcast (single mode). The row of the fitted
+parameter sets this year’s spread prediction used, from
+<code>fireSense_spreadPredict</code>; written as the
+<code>paramSet</code> column of the hindcast tables (<code>NA</code> if
+absent or, with several ELFs, not one number).</td>
+<td align="left">NA</td>
+</tr>
+<tr class="even">
 <td align="left">outputsDF</td>
 <td align="left">data.table</td>
 <td align="left">Optional; multi mode. <code>outputs(sim)</code> of all
@@ -1943,14 +1953,14 @@ maps and summaries. If missing, <code>simOutputPath</code> is
 searched.</td>
 <td align="left">NA</td>
 </tr>
-<tr class="even">
+<tr class="odd">
 <td align="left">.ELFind</td>
 <td align="left">character</td>
 <td align="left">Optional; single mode. The ELF of this run, recorded in
 its metrics row.</td>
 <td align="left">NA</td>
 </tr>
-<tr class="odd">
+<tr class="even">
 <td align="left">rasterToMatch</td>
 <td align="left">SpatRaster</td>
 <td align="left">Template raster of the simulations. Required in multi
