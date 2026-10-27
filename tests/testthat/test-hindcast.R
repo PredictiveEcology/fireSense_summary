@@ -51,6 +51,7 @@ test_that("hindcast single mode records ten decimal-year reps and the observed y
   expect_identical(reps$rep, 1:10)
   expect_type(reps$year, "integer")
   expect_true(all(reps$year == 2000L))                     # the hindcast year, not the rep time
+  expect_identical(reps$paramSet, rep(NA, 10))                 # no fireSense_SpreadParamSet: NA, not an error
   expect_equal(reps$time, 2000 + (0:9) / 1000)             # the rep time is kept for readers that used it
   expect_true(all(reps$ignitions == 2L))                   # pixels 1 and 2 are in the core, 6 is not
   expect_true(all(reps$escapes == 1L))
@@ -59,6 +60,7 @@ test_that("hindcast single mode records ten decimal-year reps and the observed y
 
   sizes <- data.table::fread(file.path(out, "hindcast_sizes.csv"))
   expect_identical(sizes$rep, 1:10)
+  expect_identical(sizes$paramSet, rep(NA, 10))
   expect_true(all(sizes$ha == 300))
 
   obs <- data.table::fread(file.path(out, "hindcast_observed.csv"))
@@ -89,6 +91,18 @@ test_that("hindcast stops when flammableRTM is missing", {
   s <- makeHindcastSim()
   s$flammableRTM <- NULL
   expect_error(SpaDES.core::spades(s, debug = FALSE), "flammableRTM")
+})
+
+test_that("hindcast tables carry the parameter set fireSense_spreadPredict used", {
+  s <- makeHindcastSim()
+  out <- SpaDES.core::outputPath(s)
+  s$fireSense_SpreadParamSet <- c(A = 3L)                  # named by ELF when spreadPredict has several
+  SpaDES.core::spades(s, debug = FALSE)
+  reps <- data.table::fread(file.path(out, "hindcast_reps.csv"))
+  sizes <- data.table::fread(file.path(out, "hindcast_sizes.csv"))
+  expect_identical(reps$paramSet, rep(3L, 10))
+  expect_identical(sizes$paramSet, rep(3L, 10))
+  expect_identical(names(reps)[1:2], c("rep", "paramSet"))
 })
 
 test_that("hindcast writes each rep's ignition and escape probability maps on the ignition grid", {
