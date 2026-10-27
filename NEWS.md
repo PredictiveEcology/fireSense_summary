@@ -1,3 +1,7 @@
+# fireSense_summary (development version)
+
+- The hindcast tables `hindcast_reps.csv` and `hindcast_sizes.csv` have a `paramSet` column: the row of the fitted spread parameter sets each rep used, read from `sim$fireSense_SpreadParamSet` (from `fireSense_spreadPredict` with `paramSetByReplicate = TRUE`, or with `.rep`). `NA` when that object is absent, so older configurations run as before.
+
 # fireSense_summary 1.0.1.9003
 
 - reqdPkgs now lists `archive`, which the module calls with `::` but did not list. Version 1.0.1.9003.

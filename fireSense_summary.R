@@ -87,6 +87,10 @@ defineModule(sim, list(
                  "Optional; hindcast (single mode). The ELF core; the simulation and the observations are clipped to it."),
     expectsInput("rstAnnualBurnID", "SpatRaster", sourceURL = NA,
                  "Optional; hindcast (single mode). This year's fire IDs from `fireSense_burn`."),
+    expectsInput("fireSense_SpreadParamSet", "integer", sourceURL = NA,
+                 paste("Optional; hindcast (single mode). The row of the fitted parameter sets this year's spread",
+                       "prediction used, from `fireSense_spreadPredict`; written as the `paramSet` column of the",
+                       "hindcast tables (`NA` if absent or, with several ELFs, not one number).")),
     expectsInput("outputsDF", "data.table",
                  desc = paste("Optional; multi mode. `outputs(sim)` of all replicates, row-bound. Its `file` column",
                               "locates the burn maps and summaries. If missing, `simOutputPath` is searched."),
@@ -223,7 +227,8 @@ hindcastRepMaps <- c("ignitionProb", "escapeProb")
 #'
 #' Called each `hindcastInterval` after `fireSense_burn`. Counts this year's ignitions, escapes, area burned and
 #' fires in the ELF core (`fireSenseUtils::hindcastSimulated()`) and writes the year's fire-ID raster and the
-#' ignition and escape probability maps used.
+#' ignition and escape probability maps used. Both tables carry `paramSet`, the parameter set
+#' `fireSense_spreadPredict` used for the rep (`sim$fireSense_SpreadParamSet`; `NA` if absent).
 #' Times need not be whole years: `rep = round((time - hindcastYear) / hindcastInterval) + 1`.
 #'
 #' @param sim A `simList`.
@@ -236,13 +241,15 @@ hindcastRecord <- function(sim) {
   if (length(missing))
     stop("hindcastYear is set, so fireSense_summary needs: ", paste(missing, collapse = ", "))
   repNo <- as.integer(round((time(sim) - P(sim)$hindcastYear) / P(sim)$hindcastInterval)) + 1L
+  paramSet <- if (length(sim$fireSense_SpreadParamSet) == 1L) as.integer(sim$fireSense_SpreadParamSet) else NA_integer_
   one <- fireSenseUtils::hindcastSimulated(sim$rstAnnualBurnID, sim$rasterToMatchELF,
                                            sim$ignitionsAndEscapes, P(sim)$escapeSizeHa)
   mod$hindcastReps <- data.table::rbindlist(list(
-    mod$hindcastReps, cbind(data.table::data.table(rep = repNo, year = as.integer(floor(time(sim) + 1e-9)),
+    mod$hindcastReps, cbind(data.table::data.table(rep = repNo, paramSet = paramSet,
+                                                   year = as.integer(floor(time(sim) + 1e-9)),
                                                    time = time(sim)), one$counts)))
   mod$hindcastSizes <- data.table::rbindlist(list(
-    mod$hindcastSizes, cbind(data.table::data.table(rep = repNo)[rep(1L, NROW(one$sizes))], one$sizes)))
+    mod$hindcastSizes, cbind(data.table::data.table(rep = repNo, paramSet = paramSet)[rep(1L, NROW(one$sizes))], one$sizes)))
   f <- file.path(outputPath(sim), sprintf("hindcast_burnID_rep%02d.tif", repNo))
   terra::writeRaster(sim$rstAnnualBurnID, f, datatype = "INT4S", overwrite = TRUE)
   ## each rep draws its own climate, so the probability maps differ by rep
