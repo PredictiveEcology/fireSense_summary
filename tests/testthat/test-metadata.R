@@ -23,6 +23,7 @@ test_that("inputs are the expected names and classes", {
       firePolys          = "list",
       fireSense_IgAndEscapeProbRas = "SpatRaster",
       fireSense_SpreadParamSet = "integer",
+      flammableRTM       = "SpatRaster",
       ignitionFirePoints = "SpatVector",
       ignitionsAndEscapes = "data.table",
       outputsDF          = "data.table",
