@@ -20,7 +20,7 @@ defineModule(sim, list(
     "FOR-CAST/fireregimetools@main (>= 0.1.0.9001)", ## fetch_nfdb_points()
     "purrr", "qs2", "RColorBrewer", "reproducible", "terra", "tidyterra",
     "raster", "rasterVis", ## TODO: remove these once fireSenseUtils::plotCumulativeBurns switched to ggplot2/tidyterra
-    "PredictiveEcology/fireSenseUtils@development (>= 0.2.3.9127)", ## hindcast*(); hindcastObserved()$points; ELFmetricsFilename(); escapes from burned-area polygons (#187)
+    "PredictiveEcology/fireSenseUtils@development (>= 0.2.3.9127)", ## hindcast*(); hindcastObserved()$points, flammableRTM; ELFmetricsFilename(); escapes from burned-area polygons (#187)
     "PredictiveEcology/SpaDES.core@development (>= 3.2.1.9038)", ## dirnamesFromSet(leafOnly = FALSE) returns the rep folder, resolveSimYears(), padYears()
     "PredictiveEcology/SpaDES.tools@development (>= 2.1.1.9000)"
   ),
@@ -85,6 +85,9 @@ defineModule(sim, list(
                        "`fireSense_ignitionPredict`, written for every rep.")),
     expectsInput("rasterToMatchELF", "SpatRaster", sourceURL = NA,
                  "Optional; hindcast (single mode). The ELF core; the simulation and the observations are clipped to it."),
+    expectsInput("flammableRTM", "SpatRaster", sourceURL = NA,
+                 paste("Optional; hindcast (single mode). The pixels the simulation can burn (from `fireSense_burn`);",
+                       "the observed area burned and fire sizes are counted on them.")),
     expectsInput("rstAnnualBurnID", "SpatRaster", sourceURL = NA,
                  "Optional; hindcast (single mode). This year's fire IDs from `fireSense_burn`."),
     expectsInput("outputsDF", "data.table",
@@ -230,7 +233,7 @@ hindcastRepMaps <- c("ignitionProb", "escapeProb")
 #'
 #' @return The `simList`, invisibly, with `mod$hindcastReps` and `mod$hindcastSizes` extended.
 hindcastRecord <- function(sim) {
-  needed <- c("rasterToMatchELF", "rstAnnualBurnID", "ignitionsAndEscapes", "fireSense_IgAndEscapeProbRas",
+  needed <- c("rasterToMatchELF", "flammableRTM", "rstAnnualBurnID", "ignitionsAndEscapes", "fireSense_IgAndEscapeProbRas",
               "ignitionFirePoints", "firePolys")
   missing <- needed[vapply(needed, function(o) is.null(sim[[o]]), logical(1))]
   if (length(missing))
@@ -256,14 +259,15 @@ hindcastRecord <- function(sim) {
 #'
 #' At `end(sim)`: the per-rep rows and fire sizes recorded by `hindcastRecord()`, and the observed ignitions,
 #' escapes, area burned (natural-cause and all-cause), fire sizes and natural ignition points of `hindcastYear`
-#' in the ELF core from `fireSenseUtils::hindcastObserved()`.
+#' in the ELF core (area and sizes on the burnable pixels, `flammableRTM`) from `fireSenseUtils::hindcastObserved()`.
 #'
 #' @param sim A `simList`.
 #'
 #' @return The `simList`, invisibly.
 hindcastSave <- function(sim) {
   obs <- fireSenseUtils::hindcastObserved(sim$rasterToMatchELF, sim$ignitionFirePoints, sim$firePolys,
-                                          P(sim)$hindcastYear, escapeSizeHa = P(sim)$escapeSizeHa)
+                                          P(sim)$hindcastYear, escapeSizeHa = P(sim)$escapeSizeHa,
+                                          flammableRTM = sim$flammableRTM)
   tables <- list(reps = mod$hindcastReps, sizes = mod$hindcastSizes, observed = obs$counts,
                  observedSizes = obs$sizes)
   files <- file.path(outputPath(sim), hindcastFiles[names(tables)])

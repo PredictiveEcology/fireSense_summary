@@ -26,6 +26,7 @@ toyHindcastObjects <- function() {
   list(rasterToMatchELF = core, rstAnnualBurnID = id,
        ignitionsAndEscapes = data.table::data.table(pixelID = c(1L, 2L, 6L), escaped = c(TRUE, FALSE, TRUE)),
        fireSense_IgAndEscapeProbRas = toyIgAndEscapeProb(),
+       flammableRTM = terra::setValues(terra::rast(core), 1L),
        burnMap = terra::setValues(terra::rast(core), 1L), burnSummary = toyBurnSummary(),
        ignitionFirePoints = pts, firePolys = list(year2000 = poly))
 }
@@ -70,6 +71,24 @@ test_that("hindcast single mode records ten decimal-year reps and the observed y
   expect_true(file.exists(file.path(out, "hindcast_burnMap.tif")))
   expect_setequal(grep("hindcast_burnID_rep", list.files(out), value = TRUE),
                   sprintf("hindcast_burnID_rep%02d.tif", 1:10))
+})
+
+test_that("hindcast counts the observed area on the burnable pixels of flammableRTM only", {
+  s <- makeHindcastSim()
+  ## only the first column burns: the 1000 m x 1000 m polygon (100 ha) has 50 ha on it
+  fl <- terra::rast(s$rasterToMatchELF)
+  s$flammableRTM <- terra::setValues(fl, ifelse(terra::colFromCell(fl, seq_len(terra::ncell(fl))) == 1, 1L, NA))
+  out <- SpaDES.core::outputPath(s)
+  SpaDES.core::spades(s, debug = FALSE)
+  obs <- data.table::fread(file.path(out, "hindcast_observed.csv"))
+  expect_equal(obs$areaBurnedHa, 50, tolerance = 0.03)
+  expect_equal(obs$areaBurnedHaPolygon, 100, tolerance = 0.03)
+})
+
+test_that("hindcast stops when flammableRTM is missing", {
+  s <- makeHindcastSim()
+  s$flammableRTM <- NULL
+  expect_error(SpaDES.core::spades(s, debug = FALSE), "flammableRTM")
 })
 
 test_that("hindcast writes each rep's ignition and escape probability maps on the ignition grid", {
