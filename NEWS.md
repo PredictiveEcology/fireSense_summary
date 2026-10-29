@@ -1,5 +1,7 @@
 # fireSense_summary (development version)
 
+- New parameter `fireCauses` (default `NULL`: unchanged, NFDB L and N, NBAC Natural), passed to `fireSenseUtils::hindcastObserved()`. Set it to `fireSense_dataPrepFit`'s `fireCauses` (e.g. `c("natural", "unknown")`) so the observed ignitions, escapes and area burned have the causes the model was fitted to. Needs fireSenseUtils with `fireCauseCodes()` (Depends-on: PredictiveEcology/fireSenseUtils#193).
+
 - The hindcast passes `flammableRTM` (new optional input, from `fireSense_burn`) to `fireSenseUtils::hindcastObserved()`, so the observed area burned and fire sizes are counted on the pixels the simulation can burn, as the simulated ones are. The polygon-area values are also written (`*Polygon` columns of `hindcast_observed.csv`). The hindcast stops if `flammableRTM` is missing. Needs fireSenseUtils#190.
 
 - The hindcast tables `hindcast_reps.csv` and `hindcast_sizes.csv` have a `paramSet` column: the row of the fitted spread parameter sets each rep used, read from `sim$fireSense_SpreadParamSet` (from `fireSense_spreadPredict` with `paramSetByReplicate = TRUE`, or with `.rep`). `NA` when that object is absent, so older configurations run as before.

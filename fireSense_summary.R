@@ -47,6 +47,10 @@ defineModule(sim, list(
                                  "set `options(mc.cores = )` to run in parallel.")),
     defineParameter("escapeSizeHa", "numeric", 50, 0, NA,
                     desc = "Fire size (ha) counted as an escape in the hindcast (`nFires50`); as in the fit."),
+    defineParameter("fireCauses", "character", NULL, NA, NA,
+                    desc = paste("Cause groups counted as the observed fire of the hindcast (`natural`, `unknown`, `human`,",
+                                 "`other`; `fireSenseUtils::fireCauseCodes()`). `NULL` (default): NFDB L and N, NBAC Natural.",
+                                 "Set it to the `fireCauses` of `fireSense_dataPrepFit` so the observed fire has the fit's causes.")),
     defineParameter("hindcastInterval", "numeric", 1, 0, NA,
                     desc = paste("Hindcast: time between the simulated rep-years. A job for year Y runs times",
                                  "Y, Y + interval, ...; rep = round((time - hindcastYear) / interval) + 1.",
@@ -274,7 +278,7 @@ hindcastRecord <- function(sim) {
 hindcastSave <- function(sim) {
   obs <- fireSenseUtils::hindcastObserved(sim$rasterToMatchELF, sim$ignitionFirePoints, sim$firePolys,
                                           P(sim)$hindcastYear, escapeSizeHa = P(sim)$escapeSizeHa,
-                                          flammableRTM = sim$flammableRTM)
+                                          flammableRTM = sim$flammableRTM, fireCauses = P(sim)$fireCauses)
   tables <- list(reps = mod$hindcastReps, sizes = mod$hindcastSizes, observed = obs$counts,
                  observedSizes = obs$sizes)
   files <- file.path(outputPath(sim), hindcastFiles[names(tables)])
