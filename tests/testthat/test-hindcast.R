@@ -181,3 +181,35 @@ test_that("hindcast multi mode pools the parameter-set folders into three figure
   figs <- list.files(root, "^hindcast_(distributions|sizes|map)[.]png$", recursive = TRUE)
   expect_equal(length(figs), 3L)
 })
+
+## fireCauses is passed to hindcastObserved(): NULL counts NFDB L/N and NBAC Natural as before; natural + unknown
+## also counts the U point and the Undetermined polygon.
+
+test_that("the observed hindcast year counts unknown-cause fire only when fireCauses has unknown", {
+  skip_if_not("fireCauseCodes" %in% getNamespaceExports("fireSenseUtils"))
+  run <- function(causes) {
+    objs <- toyHindcastObjects()
+    u <- terra::vect(cbind(3000, 5500), crs = "EPSG:3978")
+    u$YEAR <- 2000L; u$CAUSE <- "U"; u$SIZE_HA <- 10
+    objs$ignitionFirePoints <- rbind(objs$ignitionFirePoints, u)
+    p <- terra::vect("POLYGON ((500 3000, 1500 3000, 1500 4000, 500 4000, 500 3000))", crs = "EPSG:3978")
+    p$YEAR <- 2000L; p$FIRECAUS <- "Undetermined"
+    objs$firePolys <- list(year2000 = rbind(objs$firePolys[[1]], p))
+    out <- withr::local_tempdir()
+    prm <- list(mode = "single", hindcastYear = 2000L, hindcastInterval = 0.001, escapeSizeHa = 150)
+    if (!is.null(causes)) prm$fireCauses <- causes
+    s <- SpaDES.core::simInit(
+      times = list(start = 2000, end = 2000.0095), params = list(fireSense_summary = prm),
+      modules = "fireSense_summary", objects = objs,
+      paths = list(modulePath = modulePath, outputPath = out, cachePath = file.path(out, "cache"),
+                   inputPath = file.path(out, "in")))
+    SpaDES.core::spades(s, debug = FALSE)
+    data.table::fread(file.path(out, "hindcast_observed.csv"))
+  }
+  base <- run(NULL)
+  expect_identical(base$ignitions, 2L)                      # N and L, as before
+  expect_equal(base$areaBurnedHa, 100, tolerance = 0.03)
+  nat <- run(c("natural", "unknown"))
+  expect_identical(nat$ignitions, 3L)                       # plus the U point
+  expect_equal(nat$areaBurnedHa, 200, tolerance = 0.03)     # plus the Undetermined polygon
+})
