@@ -26,6 +26,7 @@ toyHindcastObjects <- function() {
   list(rasterToMatchELF = core, rstAnnualBurnID = id,
        ignitionsAndEscapes = data.table::data.table(pixelID = c(1L, 2L, 6L), escaped = c(TRUE, FALSE, TRUE)),
        fireSense_IgAndEscapeProbRas = toyIgAndEscapeProb(),
+       flammableRTM = terra::setValues(terra::rast(core), 1L),
        burnMap = terra::setValues(terra::rast(core), 1L), burnSummary = toyBurnSummary(),
        ignitionFirePoints = pts, firePolys = list(year2000 = poly))
 }
@@ -50,6 +51,7 @@ test_that("hindcast single mode records ten decimal-year reps and the observed y
   expect_identical(reps$rep, 1:10)
   expect_type(reps$year, "integer")
   expect_true(all(reps$year == 2000L))                     # the hindcast year, not the rep time
+  expect_identical(reps$paramSet, rep(NA, 10))                 # no fireSense_SpreadParamSet: NA, not an error
   expect_equal(reps$time, 2000 + (0:9) / 1000)             # the rep time is kept for readers that used it
   expect_true(all(reps$ignitions == 2L))                   # pixels 1 and 2 are in the core, 6 is not
   expect_true(all(reps$escapes == 1L))
@@ -58,6 +60,7 @@ test_that("hindcast single mode records ten decimal-year reps and the observed y
 
   sizes <- data.table::fread(file.path(out, "hindcast_sizes.csv"))
   expect_identical(sizes$rep, 1:10)
+  expect_identical(sizes$paramSet, rep(NA, 10))
   expect_true(all(sizes$ha == 300))
 
   obs <- data.table::fread(file.path(out, "hindcast_observed.csv"))
@@ -70,6 +73,36 @@ test_that("hindcast single mode records ten decimal-year reps and the observed y
   expect_true(file.exists(file.path(out, "hindcast_burnMap.tif")))
   expect_setequal(grep("hindcast_burnID_rep", list.files(out), value = TRUE),
                   sprintf("hindcast_burnID_rep%02d.tif", 1:10))
+})
+
+test_that("hindcast counts the observed area on the burnable pixels of flammableRTM only", {
+  s <- makeHindcastSim()
+  ## only the first column burns: the 1000 m x 1000 m polygon (100 ha) has 50 ha on it
+  fl <- terra::rast(s$rasterToMatchELF)
+  s$flammableRTM <- terra::setValues(fl, ifelse(terra::colFromCell(fl, seq_len(terra::ncell(fl))) == 1, 1L, NA))
+  out <- SpaDES.core::outputPath(s)
+  SpaDES.core::spades(s, debug = FALSE)
+  obs <- data.table::fread(file.path(out, "hindcast_observed.csv"))
+  expect_equal(obs$areaBurnedHa, 50, tolerance = 0.03)
+  expect_equal(obs$areaBurnedHaPolygon, 100, tolerance = 0.03)
+})
+
+test_that("hindcast stops when flammableRTM is missing", {
+  s <- makeHindcastSim()
+  s$flammableRTM <- NULL
+  expect_error(SpaDES.core::spades(s, debug = FALSE), "flammableRTM")
+})
+
+test_that("hindcast tables carry the parameter set fireSense_spreadPredict used", {
+  s <- makeHindcastSim()
+  out <- SpaDES.core::outputPath(s)
+  s$fireSense_SpreadParamSet <- c(A = 3L)                  # named by ELF when spreadPredict has several
+  SpaDES.core::spades(s, debug = FALSE)
+  reps <- data.table::fread(file.path(out, "hindcast_reps.csv"))
+  sizes <- data.table::fread(file.path(out, "hindcast_sizes.csv"))
+  expect_identical(reps$paramSet, rep(3L, 10))
+  expect_identical(sizes$paramSet, rep(3L, 10))
+  expect_identical(names(reps)[1:2], c("rep", "paramSet"))
 })
 
 test_that("hindcast writes each rep's ignition and escape probability maps on the ignition grid", {
@@ -99,11 +132,11 @@ test_that("hindcast writes the year's observed natural ignition points in the co
 
 test_that("hindcast events are scheduled only when hindcastYear is set", {
   s <- makeHindcastSim(hindcastYear = NA_integer_)
-  s <- s$.mods$fireSense_summary$doEvent.fireSense_summary(s, SpaDES.core::start(s), "init")
+  s <- runInit(s)
   expect_false(any(grepl("hindcast", SpaDES.core::events(s)$eventType)))
 
   h <- makeHindcastSim()
-  h <- h$.mods$fireSense_summary$doEvent.fireSense_summary(h, SpaDES.core::start(h), "init")
+  h <- runInit(h)
   ev <- SpaDES.core::events(h)
   expect_setequal(ev$eventType[grepl("hindcast", ev$eventType)], c("hindcastRecord", "hindcast"))
   expect_gt(ev$eventPriority[ev$eventType == "hindcast"], ev$eventPriority[ev$eventType == "hindcastRecord"])
@@ -140,11 +173,51 @@ test_that("hindcast multi mode pools the parameter-set folders into three figure
   m <- SpaDES.core::simInit(
     times = list(start = 2000, end = 2000.0095),
     params = list(fireSense_summary = list(mode = "multi", hindcastYear = 2000L, reps = 1:2,
-                                           simOutputPath = root, studyAreaName = "toy", .plots = "png")),
+                                           simOutputPath = root, .studyAreaName = "toy", .plots = "png")),
     modules = "fireSense_summary", objects = list(),
     paths = list(modulePath = modulePath, outputPath = root, cachePath = file.path(root, "cache"),
                  inputPath = file.path(root, "in")))
   SpaDES.core::spades(m, debug = FALSE)
   figs <- list.files(root, "^hindcast_(distributions|sizes|map)[.]png$", recursive = TRUE)
   expect_equal(length(figs), 3L)
+})
+
+## fireCauses is passed to hindcastObserved(): the default natural + unknown also counts the U point and the
+## Undetermined polygon; "natural" alone counts NFDB L/N and NBAC Natural only.
+
+test_that("the observed hindcast year counts unknown-cause fire by default and only when fireCauses has unknown", {
+  skip_if_not("fireCauseCodes" %in% getNamespaceExports("fireSenseUtils"))
+  run <- function(causes) {
+    objs <- toyHindcastObjects()
+    u <- terra::vect(cbind(3000, 5500), crs = "EPSG:3978")
+    u$YEAR <- 2000L; u$CAUSE <- "U"; u$SIZE_HA <- 10
+    objs$ignitionFirePoints <- rbind(objs$ignitionFirePoints, u)
+    p <- terra::vect("POLYGON ((500 3000, 1500 3000, 1500 4000, 500 4000, 500 3000))", crs = "EPSG:3978")
+    p$YEAR <- 2000L; p$FIRECAUS <- "Undetermined"
+    objs$firePolys <- list(year2000 = rbind(objs$firePolys[[1]], p))
+    out <- withr::local_tempdir()
+    prm <- list(mode = "single", hindcastYear = 2000L, hindcastInterval = 0.001, escapeSizeHa = 150)
+    if (!is.null(causes)) prm$fireCauses <- causes
+    s <- SpaDES.core::simInit(
+      times = list(start = 2000, end = 2000.0095), params = list(fireSense_summary = prm),
+      modules = "fireSense_summary", objects = objs,
+      paths = list(modulePath = modulePath, outputPath = out, cachePath = file.path(out, "cache"),
+                   inputPath = file.path(out, "in")))
+    SpaDES.core::spades(s, debug = FALSE)
+    data.table::fread(file.path(out, "hindcast_observed.csv"))
+  }
+  dflt <- run(NULL)                                         # the default is fireSenseUtils::fireSenseFireCauses
+  expect_identical(dflt$ignitions, 3L)                      # N, L and the U point
+  expect_equal(dflt$areaBurnedHa, 200, tolerance = 0.03)    # plus the Undetermined polygon
+  nat <- run("natural")
+  expect_identical(nat$ignitions, 2L)
+  expect_equal(nat$areaBurnedHa, 100, tolerance = 0.03)
+})
+
+test_that("fireCauses defaults to natural + unknown, and init errors when another module's fireCauses differs", {
+  md <- SpaDES.core::moduleMetadata(module = "fireSense_summary", path = modulePath)
+  expect_identical(md$parameters$default[md$parameters$paramName == "fireCauses"][[1]], fireSenseUtils::fireSenseFireCauses)
+  h <- makeHindcastSim()
+  SpaDES.core::params(h)$fireSense_dataPrepFit <- list(fireCauses = "natural")
+  expect_error(runInit(h), "multiple values for fireCauses")
 })

@@ -9,7 +9,7 @@ defineModule(sim, list(
     person("Ian MS", "Eddy", email = "ian.eddy@nrcan-rncan.gc.ca", role = "aut")
   ),
   childModules = character(0),
-  version = list(fireSense_summary = "1.1.0.9004"),
+  version = list(fireSense_summary = "1.1.0.9010"),
   timeframe = as.POSIXlt(c(NA, NA)),
   timeunit = "year",
   citation = list("citation.bib"),
@@ -20,11 +20,14 @@ defineModule(sim, list(
     "FOR-CAST/fireregimetools@main (>= 0.1.0.9001)", ## fetch_nfdb_points()
     "purrr", "qs2", "RColorBrewer", "reproducible", "terra", "tidyterra",
     "raster", "rasterVis", ## TODO: remove these once fireSenseUtils::plotCumulativeBurns switched to ggplot2/tidyterra
-    "PredictiveEcology/fireSenseUtils@development (>= 0.2.3.9110)", ## ELFmetricsFilename()
-    "PredictiveEcology/SpaDES.core@development (>= 3.2.1.9001)", ## dirnamesFromSet(), resolveSimYears(), padYears()
+    "PredictiveEcology/fireSenseUtils@development (>= 0.2.3.9135)", ## fireSenseFireCauses; fireCauseCodes() via hindcastObserved(fireCauses); hindcast*(); hindcastObserved()$points, flammableRTM; ELFmetricsFilename(); escapes from burned-area polygons (#187)
+    "PredictiveEcology/SpaDES.core@development (>= 3.2.1.9038)", ## dirnamesFromSet(leafOnly = FALSE) returns the rep folder, resolveSimYears(), padYears()
     "PredictiveEcology/SpaDES.tools@development (>= 2.1.1.9000)"
   ),
   parameters = rbind(
+    defineParameter(".neverCache", "character", c("init", "save_single", "hindcastRecord", "hindcast"), NA, NA,
+                    paste("Events that are never cached, whatever `.useCache` says (read by SpaDES.core, 3.2.1.9037 or later):",
+                          "every event reads the run's output files or writes files (maps, csv, figures), none of which is in the event's cache key, and a cache hit would write nothing.")),
     defineParameter("climateScenario", "character", NA, NA, NA,
                     desc = paste("Name of the CMIP6 climate scenario including SSP, formatted as in `ClimateNA`,",
                                  "e.g. 'CanESM5_SSP370'. Used in figure filenames (multi mode).")),
@@ -36,13 +39,19 @@ defineModule(sim, list(
     defineParameter(".runName", "character", NA_character_, NA, NA,
                     desc = paste("Name of this run, e.g. '13.1_NRV_370_1'; names its metrics file",
                                  "(`fireSenseUtils::ELFmetricsFilename()`). `NA`: the name of `outputPath(sim)`.")),
-    defineParameter("studyAreaName", "character", NA, NA, NA,
-                    desc = "Study area name; used in figure paths and filenames (multi mode)."),
+    defineParameter(".studyAreaName", "character", NA, NA, NA,
+                    desc = paste("Human-readable name for the study area; used in figure paths and filenames (multi mode).",
+                                 "If `NA`, a hash of `rasterToMatch` will be used.")),
     defineParameter("reps", "integer", 1L:10L, 1, NA,
                     desc = paste("Replicate numbers to summarize (multi mode). Files are read with `mclapply`;",
                                  "set `options(mc.cores = )` to run in parallel.")),
     defineParameter("escapeSizeHa", "numeric", 50, 0, NA,
                     desc = "Fire size (ha) counted as an escape in the hindcast (`nFires50`); as in the fit."),
+    defineParameter("fireCauses", "character", fireSenseUtils::fireSenseFireCauses, NA, NA,
+                    desc = paste("Cause groups counted as the observed fire of the hindcast (`natural`, `unknown`, `human`,",
+                                 "`other`; `fireSenseUtils::fireCauseCodes()`). Checked against `fireCauses` of the other modules",
+                                 "(`SpaDES.core::paramCheckOtherMods()`, e.g. `fireSense_dataPrepFit`), which must match, so the",
+                                 "observed fire has the fit's causes.")),
     defineParameter("hindcastInterval", "numeric", 1, 0, NA,
                     desc = paste("Hindcast: time between the simulated rep-years. A job for year Y runs times",
                                  "Y, Y + interval, ...; rep = round((time - hindcastYear) / interval) + 1.",
@@ -81,8 +90,15 @@ defineModule(sim, list(
                        "`fireSense_ignitionPredict`, written for every rep.")),
     expectsInput("rasterToMatchELF", "SpatRaster", sourceURL = NA,
                  "Optional; hindcast (single mode). The ELF core; the simulation and the observations are clipped to it."),
+    expectsInput("flammableRTM", "SpatRaster", sourceURL = NA,
+                 paste("Optional; hindcast (single mode). The pixels the simulation can burn (from `fireSense_burn`);",
+                       "the observed area burned and fire sizes are counted on them.")),
     expectsInput("rstAnnualBurnID", "SpatRaster", sourceURL = NA,
                  "Optional; hindcast (single mode). This year's fire IDs from `fireSense_burn`."),
+    expectsInput("fireSense_SpreadParamSet", "integer", sourceURL = NA,
+                 paste("Optional; hindcast (single mode). The row of the fitted parameter sets this year's spread",
+                       "prediction used, from `fireSense_spreadPredict`; written as the `paramSet` column of the",
+                       "hindcast tables (`NA` if absent or, with several ELFs, not one number).")),
     expectsInput("outputsDF", "data.table",
                  desc = paste("Optional; multi mode. `outputs(sim)` of all replicates, row-bound. Its `file` column",
                               "locates the burn maps and summaries. If missing, `simOutputPath` is searched."),
@@ -115,6 +131,19 @@ doEvent.fireSense_summary = function(sim, eventTime, eventType) {
   switch(
     eventType,
     init = {
+      ## the cause set must be the one the other modules (e.g. fireSense_dataPrepFit) use
+      SpaDES.core::paramCheckOtherMods(sim, "fireCauses", ifSetButDifferent = "error")
+      ## `studyAreaName` was renamed `.studyAreaName`; still honour the old name
+      oldStudyAreaName <- P(sim)$studyAreaName # nolint: param_used_undeclared
+      if (!is.null(oldStudyAreaName)) {
+        warning("fireSense_summary: the `studyAreaName` parameter is now `.studyAreaName`; ",
+                "please rename it.", call. = FALSE)
+        if (is.na(P(sim)$.studyAreaName))
+          P(sim)$.studyAreaName <- oldStudyAreaName
+      }
+      ## the module has no studyArea, so an unnamed study area is named after its template raster
+      if (is.na(P(sim)$.studyAreaName) && !is.null(sim$rasterToMatch))
+        P(sim)$.studyAreaName <- reproducible::.robustDigest(sim$rasterToMatch, algo = "xxhash64")
       if (P(sim)$mode == "single") {
         sim <- scheduleEvent(sim, end(sim), "fireSense_summary", "save_single", .last())
         if (!is.na(P(sim)$hindcastYear)) {
@@ -131,7 +160,7 @@ doEvent.fireSense_summary = function(sim, eventTime, eventType) {
 
         f_burnSummary_plot <- fireSenseUtils::plotBurnSummary(
           climateScenario = P(sim)$climateScenario,
-          studyAreaName = P(sim)$studyAreaName,
+          studyAreaName = P(sim)$.studyAreaName,
           outputDir = P(sim)$simOutputPath,
           Nreps = max(P(sim)$reps),
           years = P(sim)$years,
@@ -142,7 +171,7 @@ doEvent.fireSense_summary = function(sim, eventTime, eventType) {
 
         f_cumulBurn_plot <- fireSenseUtils::plotCumulativeBurns(
           climateScenario = P(sim)$climateScenario,
-          studyAreaName = P(sim)$studyAreaName,
+          studyAreaName = P(sim)$.studyAreaName,
           outputDir = P(sim)$simOutputPath,
           Nreps = max(P(sim)$reps),
           years = P(sim)$years,
@@ -153,7 +182,7 @@ doEvent.fireSense_summary = function(sim, eventTime, eventType) {
 
         f_historic_plot <- fireSenseUtils::plotHistoricFires(
           climateScenario = as.character(P(sim)$climateScenario),
-          studyAreaName = P(sim)$studyAreaName,
+          studyAreaName = P(sim)$.studyAreaName,
           outputDir = P(sim)$simOutputPath,
           pixelSize = unique(terra::res(sim$rasterToMatch)),
           firePolys = mod$firePolys,
@@ -171,7 +200,9 @@ doEvent.fireSense_summary = function(sim, eventTime, eventType) {
       sim <- registerOutputs(f_burnMap, sim)
 
       f_burnSummary <- file.path(outputPath(sim), "fireSense_burnSummary.csv")
-      data.table::fwrite(sim$burnSummary, file = f_burnSummary)
+      ## fireSense_burn leaves burnSummary NULL in a run without fire; the file is still written (empty),
+      ## because the multi-mode summary expects one per run
+      data.table::fwrite(sim$burnSummary %||% data.table::data.table(), file = f_burnSummary)
       sim <- registerOutputs(f_burnSummary, sim)
       ## a hindcast writes its metrics in hindcastSave(), after its last rep-year
       if (is.na(P(sim)$hindcastYear))
@@ -206,26 +237,29 @@ hindcastRepMaps <- c("ignitionProb", "escapeProb")
 #'
 #' Called each `hindcastInterval` after `fireSense_burn`. Counts this year's ignitions, escapes, area burned and
 #' fires in the ELF core (`fireSenseUtils::hindcastSimulated()`) and writes the year's fire-ID raster and the
-#' ignition and escape probability maps used.
+#' ignition and escape probability maps used. Both tables carry `paramSet`, the parameter set
+#' `fireSense_spreadPredict` used for the rep (`sim$fireSense_SpreadParamSet`; `NA` if absent).
 #' Times need not be whole years: `rep = round((time - hindcastYear) / hindcastInterval) + 1`.
 #'
 #' @param sim A `simList`.
 #'
 #' @return The `simList`, invisibly, with `mod$hindcastReps` and `mod$hindcastSizes` extended.
 hindcastRecord <- function(sim) {
-  needed <- c("rasterToMatchELF", "rstAnnualBurnID", "ignitionsAndEscapes", "fireSense_IgAndEscapeProbRas",
+  needed <- c("rasterToMatchELF", "flammableRTM", "rstAnnualBurnID", "ignitionsAndEscapes", "fireSense_IgAndEscapeProbRas",
               "ignitionFirePoints", "firePolys")
   missing <- needed[vapply(needed, function(o) is.null(sim[[o]]), logical(1))]
   if (length(missing))
     stop("hindcastYear is set, so fireSense_summary needs: ", paste(missing, collapse = ", "))
   repNo <- as.integer(round((time(sim) - P(sim)$hindcastYear) / P(sim)$hindcastInterval)) + 1L
+  paramSet <- if (length(sim$fireSense_SpreadParamSet) == 1L) as.integer(sim$fireSense_SpreadParamSet) else NA_integer_
   one <- fireSenseUtils::hindcastSimulated(sim$rstAnnualBurnID, sim$rasterToMatchELF,
                                            sim$ignitionsAndEscapes, P(sim)$escapeSizeHa)
   mod$hindcastReps <- data.table::rbindlist(list(
-    mod$hindcastReps, cbind(data.table::data.table(rep = repNo, year = as.integer(floor(time(sim) + 1e-9)),
+    mod$hindcastReps, cbind(data.table::data.table(rep = repNo, paramSet = paramSet,
+                                                   year = as.integer(floor(time(sim) + 1e-9)),
                                                    time = time(sim)), one$counts)))
   mod$hindcastSizes <- data.table::rbindlist(list(
-    mod$hindcastSizes, cbind(data.table::data.table(rep = repNo)[rep(1L, NROW(one$sizes))], one$sizes)))
+    mod$hindcastSizes, cbind(data.table::data.table(rep = repNo, paramSet = paramSet)[rep(1L, NROW(one$sizes))], one$sizes)))
   f <- file.path(outputPath(sim), sprintf("hindcast_burnID_rep%02d.tif", repNo))
   terra::writeRaster(sim$rstAnnualBurnID, f, datatype = "INT4S", overwrite = TRUE)
   ## each rep draws its own climate, so the probability maps differ by rep
@@ -239,14 +273,15 @@ hindcastRecord <- function(sim) {
 #'
 #' At `end(sim)`: the per-rep rows and fire sizes recorded by `hindcastRecord()`, and the observed ignitions,
 #' escapes, area burned (natural-cause and all-cause), fire sizes and natural ignition points of `hindcastYear`
-#' in the ELF core from `fireSenseUtils::hindcastObserved()`.
+#' in the ELF core (area and sizes on the burnable pixels, `flammableRTM`) from `fireSenseUtils::hindcastObserved()`.
 #'
 #' @param sim A `simList`.
 #'
 #' @return The `simList`, invisibly.
 hindcastSave <- function(sim) {
   obs <- fireSenseUtils::hindcastObserved(sim$rasterToMatchELF, sim$ignitionFirePoints, sim$firePolys,
-                                          P(sim)$hindcastYear, escapeSizeHa = P(sim)$escapeSizeHa)
+                                          P(sim)$hindcastYear, escapeSizeHa = P(sim)$escapeSizeHa,
+                                          flammableRTM = sim$flammableRTM, fireCauses = P(sim)$fireCauses)
   tables <- list(reps = mod$hindcastReps, sizes = mod$hindcastSizes, observed = obs$counts,
                  observedSizes = obs$sizes)
   files <- file.path(outputPath(sim), hindcastFiles[names(tables)])
@@ -353,7 +388,7 @@ hindcastFigures <- function(sim) {
   polys <- if (file.exists(polyFile)) terra::vect(polyFile)
   ## the burn maps count the rep-years in which a pixel burned; sum them over the parameter sets
   burn <- Reduce(`+`, lapply(dirs, function(d) terra::rast(file.path(d, hindcastFiles[["burnMap"]]))))
-  title <- paste(P(sim)$studyAreaName, P(sim)$hindcastYear)
+  title <- paste(P(sim)$.studyAreaName, P(sim)$hindcastYear)
   checkPath(figurePath(sim), create = TRUE)
   Plots(reps, fn = fireSenseUtils::plotHindcastDistributions, observed = obs, title = title,
         types = P(sim)$.plots, filename = "hindcast_distributions", path = figurePath(sim))
@@ -386,7 +421,19 @@ InitMulti <- function(sim) {
   ## check for necessary output files -----------------------------------------------
   ## NOTE: don't load simLists -- slow and unreliable
   mod$useOutputs <- NROW(sim$outputsDF) > 0
-  mod$allReps <- dirnamesFromSet(sim$outputsDF$file, P(sim)$reps)
+  ## without outputsDF, the files on disk say how the rep folders are padded (rep1 or rep01)
+  bmbPattern <- "burnMap|burnSummary"
+  filesOnDisk <- if (mod$useOutputs) {
+    sim$outputsDF$file
+  } else {
+    fs::dir_ls(
+      P(sim)$simOutputPath,
+      regexp = bmbPattern,
+      recurse = 1,
+      type = "file"
+    )
+  }
+  mod$allReps <- dirnamesFromSet(filesOnDisk, P(sim)$reps)
   ## assigned back: P(sim)$years is read downstream, not just for padding
   P(sim)$years <- resolveSimYears(P(sim)$years, sim)
   pad <- padYears(P(sim)$years)
@@ -396,8 +443,8 @@ InitMulti <- function(sim) {
   if (mod$useOutputs) {
     mod$bmbs <- grep(
       value = TRUE,
-      sim$outputsDF$file,
-      pattern = "burnMap|burnSummary"
+      filesOnDisk,
+      pattern = bmbPattern
     ) |>
       grep(paste0("(", paste0(mod$allReps, collapse = "|"), ")"), x = _, value = TRUE) |>
       grep("gri|png|txt|xml", x = _, value = TRUE, invert = TRUE)
@@ -406,14 +453,16 @@ InitMulti <- function(sim) {
     ## restored from another machine), so let the plotting functions use these paths
     mod$simFiles <- mod$bmbs
   } else {
-    mod$bmbs <- fs::dir_ls(
-      P(sim)$simOutputPath,
-      regexp = "burnMap|burnSummary",
-      recurse = 1,
-      type = "file"
-    ) |>
-      grep(paste0("(", paste0(P(sim)$reps, collapse = "|"), ")"), x = _, value = TRUE) |>
-      grep(paste0("_year(", paste0(P(sim)$years, collapse = "|"), ")"), x = _, value = TRUE)
+    inReps <- grepl(paste0("(", paste0(P(sim)$reps, collapse = "|"), ")"), filesOnDisk)
+    ## the year is in the burn map names only; the burn summary csv has none
+    inYears <- !grepl("burnMap", filesOnDisk) |
+      grepl(paste0("_year(", paste0(P(sim)$years, collapse = "|"), ")"), filesOnDisk)
+    mod$bmbs <- filesOnDisk[inReps & inYears]
+
+    if (length(mod$allReps) < length(P(sim)$reps)) {
+      stop("replicate folders appear to be missing under ", P(sim)$simOutputPath,
+           ": found ", length(mod$allReps), " of ", length(P(sim)$reps))
+    }
 
     filesUserHas <- c(mod$bmbs)
 

@@ -11,7 +11,7 @@
 
 <meta name="author" content="Alex Chubaty" />
 
-<meta name="date" content="2026-10-19" />
+<meta name="date" content="2026-10-30" />
 
 <title>fireSense_summary</title>
 
@@ -1623,7 +1623,7 @@ display: none;
 
 <h1 class="title toc-ignore">fireSense_summary</h1>
 <h4 class="author">Alex Chubaty</h4>
-<h4 class="date">19 October 2026</h4>
+<h4 class="date">30 October 2026</h4>
 
 </div>
 
@@ -1658,7 +1658,7 @@ mySim &lt;- simInit(
   params = list(fireSense_summary = list(
     mode = &quot;multi&quot;,
     simOutputPath = &quot;outputs/myStudyArea&quot;, ## holds rep01/, rep02/, ...
-    studyAreaName = &quot;myStudyArea&quot;,
+    .studyAreaName = &quot;myStudyArea&quot;,
     climateScenario = &quot;CanESM5_SSP370&quot;,
     reps = 1L:10L
   )),
@@ -1680,10 +1680,11 @@ National Fire Database.</p>
 <colgroup>
 <col width="2%" />
 <col width="1%" />
-<col width="2%" />
+<col width="1%" />
 <col width="0%" />
 <col width="0%" />
-<col width="92%" />
+<col width="91%" />
+<col width="1%" />
 </colgroup>
 <thead>
 <tr class="header">
@@ -1693,10 +1694,24 @@ National Fire Database.</p>
 <th align="left">min</th>
 <th align="left">max</th>
 <th align="left">paramDesc</th>
+<th align="left">cacheKey</th>
 </tr>
 </thead>
 <tbody>
 <tr class="odd">
+<td align="left">.neverCache</td>
+<td align="left">character</td>
+<td align="left">init, sa….</td>
+<td align="left">NA</td>
+<td align="left">NA</td>
+<td align="left">Events that are never cached, whatever
+<code>.useCache</code> says (read by SpaDES.core, 3.2.1.9037 or later):
+every event reads the run’s output files or writes files (maps, csv,
+figures), none of which is in the event’s cache key, and a cache hit
+would write nothing.</td>
+<td align="left">TRUE</td>
+</tr>
+<tr class="even">
 <td align="left">climateScenario</td>
 <td align="left">character</td>
 <td align="left">NA</td>
@@ -1705,8 +1720,9 @@ National Fire Database.</p>
 <td align="left">Name of the CMIP6 climate scenario including SSP,
 formatted as in <code>ClimateNA</code>, e.g. ‘CanESM5_SSP370’. Used in
 figure filenames (multi mode).</td>
+<td align="left">TRUE</td>
 </tr>
-<tr class="even">
+<tr class="odd">
 <td align="left">mode</td>
 <td align="left">character</td>
 <td align="left">single</td>
@@ -1716,8 +1732,9 @@ figure filenames (multi mode).</td>
 <code>burnMap</code> and <code>burnSummary</code> at
 <code>end(sim)</code>. ‘multi’: summarize the saved outputs of several
 replicates in figures.</td>
+<td align="left">TRUE</td>
 </tr>
-<tr class="odd">
+<tr class="even">
 <td align="left">simOutputPath</td>
 <td align="left">character</td>
 <td align="left">/tmp/Rtm….</td>
@@ -1725,8 +1742,9 @@ replicates in figures.</td>
 <td align="left">NA</td>
 <td align="left">Directory holding the replicate output directories, and
 where figures are written (multi mode).</td>
+<td align="left">TRUE</td>
 </tr>
-<tr class="even">
+<tr class="odd">
 <td align="left">.runName</td>
 <td align="left">character</td>
 <td align="left">NA</td>
@@ -1735,17 +1753,20 @@ where figures are written (multi mode).</td>
 <td align="left">Name of this run, e.g. ‘13.1_NRV_370_1’; names its
 metrics file (<code>fireSenseUtils::ELFmetricsFilename()</code>).
 <code>NA</code>: the name of <code>outputPath(sim)</code>.</td>
+<td align="left">TRUE</td>
 </tr>
-<tr class="odd">
-<td align="left">studyAreaName</td>
+<tr class="even">
+<td align="left">.studyAreaName</td>
 <td align="left">character</td>
 <td align="left">NA</td>
 <td align="left">NA</td>
 <td align="left">NA</td>
-<td align="left">Study area name; used in figure paths and filenames
-(multi mode).</td>
+<td align="left">Human-readable name for the study area; used in figure
+paths and filenames (multi mode). If <code>NA</code>, a hash of
+<code>rasterToMatch</code> will be used.</td>
+<td align="left">TRUE</td>
 </tr>
-<tr class="even">
+<tr class="odd">
 <td align="left">reps</td>
 <td align="left">integer</td>
 <td align="left">1, 2, 3,….</td>
@@ -1754,8 +1775,9 @@ metrics file (<code>fireSenseUtils::ELFmetricsFilename()</code>).
 <td align="left">Replicate numbers to summarize (multi mode). Files are
 read with <code>mclapply</code>; set <code>options(mc.cores = )</code>
 to run in parallel.</td>
+<td align="left">TRUE</td>
 </tr>
-<tr class="odd">
+<tr class="even">
 <td align="left">escapeSizeHa</td>
 <td align="left">numeric</td>
 <td align="left">50</td>
@@ -1763,6 +1785,23 @@ to run in parallel.</td>
 <td align="left">NA</td>
 <td align="left">Fire size (ha) counted as an escape in the hindcast
 (<code>nFires50</code>); as in the fit.</td>
+<td align="left">TRUE</td>
+</tr>
+<tr class="odd">
+<td align="left">fireCauses</td>
+<td align="left">character</td>
+<td align="left">natural,….</td>
+<td align="left">NA</td>
+<td align="left">NA</td>
+<td align="left">Cause groups counted as the observed fire of the
+hindcast (<code>natural</code>, <code>unknown</code>,
+<code>human</code>, <code>other</code>;
+<code>fireSenseUtils::fireCauseCodes()</code>). Checked against
+<code>fireCauses</code> of the other modules
+(<code>SpaDES.core::paramCheckOtherMods()</code>,
+e.g. <code>fireSense_dataPrepFit</code>), which must match, so the
+observed fire has the fit’s causes.</td>
+<td align="left">TRUE</td>
 </tr>
 <tr class="even">
 <td align="left">hindcastInterval</td>
@@ -1774,6 +1813,7 @@ to run in parallel.</td>
 for year Y runs times Y, Y + interval, …; rep = round((time -
 hindcastYear) / interval) + 1. Set it to the predict modules’ interval
 (e.g. 0.001).</td>
+<td align="left">TRUE</td>
 </tr>
 <tr class="odd">
 <td align="left">hindcastYear</td>
@@ -1795,6 +1835,7 @@ Single mode records each rep-year and, at <code>end(sim)</code>, writes
 <code>hindcast_escapeProb_rep&lt;rep&gt;.tif</code>. Multi mode pools
 the replicate folders (parameter sets) in hindcast figures instead of
 the usual multi-mode figures.</td>
+<td align="left">TRUE</td>
 </tr>
 <tr class="even">
 <td align="left">years</td>
@@ -1805,6 +1846,7 @@ the usual multi-mode figures.</td>
 <td align="left">Which two simulation years should be compared?
 Typically start and end years. Defaults to the simulation’s own start
 and end times.</td>
+<td align="left">TRUE</td>
 </tr>
 </tbody>
 </table>
@@ -1836,10 +1878,10 @@ historical ignitions, escapes and area burned.</p>
 <h2>Input data</h2>
 <table>
 <colgroup>
-<col width="13%" />
-<col width="5%" />
-<col width="76%" />
-<col width="4%" />
+<col width="9%" />
+<col width="3%" />
+<col width="83%" />
+<col width="3%" />
 </colgroup>
 <thead>
 <tr class="header">
@@ -1902,10 +1944,28 @@ simulation and the observations are clipped to it.</td>
 <td align="left">NA</td>
 </tr>
 <tr class="even">
+<td align="left">flammableRTM</td>
+<td align="left">SpatRaster</td>
+<td align="left">Optional; hindcast (single mode). The pixels the
+simulation can burn (from <code>fireSense_burn</code>); the observed
+area burned and fire sizes are counted on them.</td>
+<td align="left">NA</td>
+</tr>
+<tr class="odd">
 <td align="left">rstAnnualBurnID</td>
 <td align="left">SpatRaster</td>
 <td align="left">Optional; hindcast (single mode). This year’s fire IDs
 from <code>fireSense_burn</code>.</td>
+<td align="left">NA</td>
+</tr>
+<tr class="even">
+<td align="left">fireSense_SpreadParamSet</td>
+<td align="left">integer</td>
+<td align="left">Optional; hindcast (single mode). The row of the fitted
+parameter sets this year’s spread prediction used, from
+<code>fireSense_spreadPredict</code>; written as the
+<code>paramSet</code> column of the hindcast tables (<code>NA</code> if
+absent or, with several ELFs, not one number).</td>
 <td align="left">NA</td>
 </tr>
 <tr class="odd">

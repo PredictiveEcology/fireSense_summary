@@ -39,6 +39,24 @@ test_that("single mode writes the burn map, summary and metrics row, named for e
   expect_equal(dt$sizeHa, c(10, 20, 30))
 })
 
+test_that("a run without fire writes an empty burn summary", {
+  ## fireSense_burn leaves burnSummary NULL when nothing burned; a one-year hindcast run
+  ## without fire failed here (fwrite: is.list(x) is not TRUE)
+  out <- withr::local_tempdir()
+  s <- SpaDES.core::simInit(
+    times = list(start = 2011, end = 2011),
+    params = list(fireSense_summary = list(mode = "single")),
+    modules = "fireSense_summary",
+    objects = list(burnMap = toyBurnMap()),
+    paths = list(modulePath = modulePath, outputPath = out,
+                 cachePath = file.path(out, "cache"), inputPath = file.path(out, "in"))
+  )
+  SpaDES.core::spades(s, debug = FALSE)
+  f <- file.path(out, "fireSense_burnSummary.csv")
+  expect_true(file.exists(f))
+  expect_identical(NROW(suppressWarnings(data.table::fread(f))), 0L)
+})
+
 test_that("all written files are registered in outputs(sim)", {
   ## registerOutputs() is what makes these files discoverable by a later multi-mode
   ## run via `outputsDF`; if it stops happening the summary silently sees nothing.
@@ -82,9 +100,7 @@ test_that("single-mode init schedules exactly one save_single at end(sim)", {
   ## inside init) and so must never write burn maps.
   s <- makeSingleSim()
   before <- SpaDES.core::events(s)
-  after <- SpaDES.core::events(
-    s$.mods$fireSense_summary$doEvent.fireSense_summary(s, SpaDES.core::start(s), "init")
-  )
+  after <- SpaDES.core::events(runInit(s))
   added <- after[!after$eventType %in% before$eventType, ]
   expect_identical(NROW(added), 1L)
   expect_identical(added$eventType, "save_single")
