@@ -100,9 +100,7 @@ test_that("single-mode init schedules exactly one save_single at end(sim)", {
   ## inside init) and so must never write burn maps.
   s <- makeSingleSim()
   before <- SpaDES.core::events(s)
-  after <- SpaDES.core::events(
-    s$.mods$fireSense_summary$doEvent.fireSense_summary(s, SpaDES.core::start(s), "init")
-  )
+  after <- SpaDES.core::events(runInit(s))
   added <- after[!after$eventType %in% before$eventType, ]
   expect_identical(NROW(added), 1L)
   expect_identical(added$eventType, "save_single")

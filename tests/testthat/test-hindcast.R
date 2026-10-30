@@ -132,11 +132,11 @@ test_that("hindcast writes the year's observed natural ignition points in the co
 
 test_that("hindcast events are scheduled only when hindcastYear is set", {
   s <- makeHindcastSim(hindcastYear = NA_integer_)
-  s <- s$.mods$fireSense_summary$doEvent.fireSense_summary(s, SpaDES.core::start(s), "init")
+  s <- runInit(s)
   expect_false(any(grepl("hindcast", SpaDES.core::events(s)$eventType)))
 
   h <- makeHindcastSim()
-  h <- h$.mods$fireSense_summary$doEvent.fireSense_summary(h, SpaDES.core::start(h), "init")
+  h <- runInit(h)
   ev <- SpaDES.core::events(h)
   expect_setequal(ev$eventType[grepl("hindcast", ev$eventType)], c("hindcastRecord", "hindcast"))
   expect_gt(ev$eventPriority[ev$eventType == "hindcast"], ev$eventPriority[ev$eventType == "hindcastRecord"])
@@ -182,10 +182,10 @@ test_that("hindcast multi mode pools the parameter-set folders into three figure
   expect_equal(length(figs), 3L)
 })
 
-## fireCauses is passed to hindcastObserved(): NULL counts NFDB L/N and NBAC Natural as before; natural + unknown
-## also counts the U point and the Undetermined polygon.
+## fireCauses is passed to hindcastObserved(): the default natural + unknown also counts the U point and the
+## Undetermined polygon; "natural" alone counts NFDB L/N and NBAC Natural only.
 
-test_that("the observed hindcast year counts unknown-cause fire only when fireCauses has unknown", {
+test_that("the observed hindcast year counts unknown-cause fire by default and only when fireCauses has unknown", {
   skip_if_not("fireCauseCodes" %in% getNamespaceExports("fireSenseUtils"))
   run <- function(causes) {
     objs <- toyHindcastObjects()
@@ -206,10 +206,18 @@ test_that("the observed hindcast year counts unknown-cause fire only when fireCa
     SpaDES.core::spades(s, debug = FALSE)
     data.table::fread(file.path(out, "hindcast_observed.csv"))
   }
-  base <- run(NULL)
-  expect_identical(base$ignitions, 2L)                      # N and L, as before
-  expect_equal(base$areaBurnedHa, 100, tolerance = 0.03)
-  nat <- run(c("natural", "unknown"))
-  expect_identical(nat$ignitions, 3L)                       # plus the U point
-  expect_equal(nat$areaBurnedHa, 200, tolerance = 0.03)     # plus the Undetermined polygon
+  dflt <- run(NULL)                                         # the default is fireSenseUtils::fireSenseFireCauses
+  expect_identical(dflt$ignitions, 3L)                      # N, L and the U point
+  expect_equal(dflt$areaBurnedHa, 200, tolerance = 0.03)    # plus the Undetermined polygon
+  nat <- run("natural")
+  expect_identical(nat$ignitions, 2L)
+  expect_equal(nat$areaBurnedHa, 100, tolerance = 0.03)
+})
+
+test_that("fireCauses defaults to natural + unknown, and init errors when another module's fireCauses differs", {
+  md <- SpaDES.core::moduleMetadata(module = "fireSense_summary", path = modulePath)
+  expect_identical(md$parameters$default[md$parameters$paramName == "fireCauses"][[1]], fireSenseUtils::fireSenseFireCauses)
+  h <- makeHindcastSim()
+  SpaDES.core::params(h)$fireSense_dataPrepFit <- list(fireCauses = "natural")
+  expect_error(runInit(h), "multiple values for fireCauses")
 })

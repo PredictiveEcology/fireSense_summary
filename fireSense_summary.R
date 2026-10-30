@@ -47,10 +47,11 @@ defineModule(sim, list(
                                  "set `options(mc.cores = )` to run in parallel.")),
     defineParameter("escapeSizeHa", "numeric", 50, 0, NA,
                     desc = "Fire size (ha) counted as an escape in the hindcast (`nFires50`); as in the fit."),
-    defineParameter("fireCauses", "character", NULL, NA, NA,
+    defineParameter("fireCauses", "character", fireSenseUtils::fireSenseFireCauses, NA, NA,
                     desc = paste("Cause groups counted as the observed fire of the hindcast (`natural`, `unknown`, `human`,",
-                                 "`other`; `fireSenseUtils::fireCauseCodes()`). `NULL` (default): NFDB L and N, NBAC Natural.",
-                                 "Set it to the `fireCauses` of `fireSense_dataPrepFit` so the observed fire has the fit's causes.")),
+                                 "`other`; `fireSenseUtils::fireCauseCodes()`). Checked against `fireCauses` of the other modules",
+                                 "(`SpaDES.core::paramCheckOtherMods()`, e.g. `fireSense_dataPrepFit`), which must match, so the",
+                                 "observed fire has the fit's causes.")),
     defineParameter("hindcastInterval", "numeric", 1, 0, NA,
                     desc = paste("Hindcast: time between the simulated rep-years. A job for year Y runs times",
                                  "Y, Y + interval, ...; rep = round((time - hindcastYear) / interval) + 1.",
@@ -130,6 +131,8 @@ doEvent.fireSense_summary = function(sim, eventTime, eventType) {
   switch(
     eventType,
     init = {
+      ## the cause set must be the one the other modules (e.g. fireSense_dataPrepFit) use
+      SpaDES.core::paramCheckOtherMods(sim, "fireCauses", ifSetButDifferent = "error")
       ## `studyAreaName` was renamed `.studyAreaName`; still honour the old name
       oldStudyAreaName <- P(sim)$studyAreaName # nolint: param_used_undeclared
       if (!is.null(oldStudyAreaName)) {
