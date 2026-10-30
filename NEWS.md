@@ -1,6 +1,6 @@
 # fireSense_summary (development version)
 
-- New parameter `fireCauses` (default `NULL`: unchanged, NFDB L and N, NBAC Natural), passed to `fireSenseUtils::hindcastObserved()`. Set it to `fireSense_dataPrepFit`'s `fireCauses` (e.g. `c("natural", "unknown")`) so the observed ignitions, escapes and area burned have the causes the model was fitted to. Needs fireSenseUtils with `fireCauseCodes()` (Depends-on: PredictiveEcology/fireSenseUtils#193).
+- New parameter `fireCauses` (default `c("natural", "unknown")`, as in `fireSense_dataPrepFit`), passed to `fireSenseUtils::hindcastObserved()`, so the observed ignitions, escapes and area burned have the causes the model was fitted to. `init` checks it against the other modules with `SpaDES.core::paramCheckOtherMods()` and errors if they differ; `NULL` is no longer the default. Needs fireSenseUtils with `fireCauseCodes()` (Depends-on: PredictiveEcology/fireSenseUtils#193).
 
 - The hindcast passes `flammableRTM` (new optional input, from `fireSense_burn`) to `fireSenseUtils::hindcastObserved()`, so the observed area burned and fire sizes are counted on the pixels the simulation can burn, as the simulated ones are. The polygon-area values are also written (`*Polygon` columns of `hindcast_observed.csv`). The hindcast stops if `flammableRTM` is missing. Needs fireSenseUtils#190.
 
