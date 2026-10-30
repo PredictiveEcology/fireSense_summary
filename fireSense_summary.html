@@ -11,7 +11,7 @@
 
 <meta name="author" content="Alex Chubaty" />
 
-<meta name="date" content="2026-10-29" />
+<meta name="date" content="2026-10-30" />
 
 <title>fireSense_summary</title>
 
@@ -1623,7 +1623,7 @@ display: none;
 
 <h1 class="title toc-ignore">fireSense_summary</h1>
 <h4 class="author">Alex Chubaty</h4>
-<h4 class="date">29 October 2026</h4>
+<h4 class="date">30 October 2026</h4>
 
 </div>
 
@@ -1790,15 +1790,16 @@ to run in parallel.</td>
 <tr class="odd">
 <td align="left">fireCauses</td>
 <td align="left">character</td>
-<td align="left"></td>
+<td align="left">natural,….</td>
 <td align="left">NA</td>
 <td align="left">NA</td>
 <td align="left">Cause groups counted as the observed fire of the
 hindcast (<code>natural</code>, <code>unknown</code>,
 <code>human</code>, <code>other</code>;
-<code>fireSenseUtils::fireCauseCodes()</code>). <code>NULL</code>
-(default): NFDB L and N, NBAC Natural. Set it to the
-<code>fireCauses</code> of <code>fireSense_dataPrepFit</code> so the
+<code>fireSenseUtils::fireCauseCodes()</code>). Checked against
+<code>fireCauses</code> of the other modules
+(<code>SpaDES.core::paramCheckOtherMods()</code>,
+e.g. <code>fireSense_dataPrepFit</code>), which must match, so the
 observed fire has the fit’s causes.</td>
 <td align="left">TRUE</td>
 </tr>
