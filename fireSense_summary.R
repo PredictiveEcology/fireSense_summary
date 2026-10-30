@@ -47,7 +47,7 @@ defineModule(sim, list(
                                  "set `options(mc.cores = )` to run in parallel.")),
     defineParameter("escapeSizeHa", "numeric", 50, 0, NA,
                     desc = "Fire size (ha) counted as an escape in the hindcast (`nFires50`); as in the fit."),
-    defineParameter("fireCauses", "character", c("natural", "unknown"), NA, NA,
+    defineParameter("fireCauses", "character", fireSenseUtils::fireSenseFireCauses, NA, NA,
                     desc = paste("Cause groups counted as the observed fire of the hindcast (`natural`, `unknown`, `human`,",
                                  "`other`; `fireSenseUtils::fireCauseCodes()`). Checked against `fireCauses` of the other modules",
                                  "(`SpaDES.core::paramCheckOtherMods()`, e.g. `fireSense_dataPrepFit`), which must match, so the",
