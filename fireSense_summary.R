@@ -33,7 +33,11 @@ defineModule(sim, list(
                                  "e.g. 'CanESM5_SSP370'. Used in figure filenames (multi mode).")),
     defineParameter("mode", "character", "single", NA, NA,
                     paste("'single': run within a simulation, saving `burnMap` and `burnSummary` at `end(sim)`.",
-                          "'multi': summarize the saved outputs of several replicates in figures.")),
+                          "'multi': summarize the saved outputs of several replicates in figures.",
+                          "'ELFmap': draw only the map of Canada's ELFs with `reportedELFs` filled green, from `ELFs`",
+                          "(e.g. the ELFs a multi-ELF report covers); written to `simOutputPath` as ELFmap.")),
+    defineParameter("reportedELFs", "character", NA_character_, NA, NA,
+                    desc = "(mode = 'ELFmap') the ELFs filled green on the map, e.g. c(\"6.4\", \"9.3\")."),
     defineParameter("simOutputPath", "character", outputPath(sim), NA, NA,
                     desc = "Directory holding the replicate output directories, and where figures are written (multi mode)."),
     defineParameter(".runName", "character", NA_character_, NA, NA,
@@ -105,6 +109,9 @@ defineModule(sim, list(
                  sourceURL = NA),
     expectsInput(".ELFind", "character", sourceURL = NA,
                  "Optional; single mode. The ELF of this run, recorded in its metrics row."),
+    expectsInput("ELFs", "list", sourceURL = NA,
+                 desc = paste("Required in mode 'ELFmap'. All ELFs as fireSense_ELFs leaves them (merges applied):",
+                              "a list with `rasWhole`, `rasCentered` and, if present, `poly`.")),
     expectsInput("rasterToMatch", "SpatRaster",
                  "Template raster of the simulations. Required in multi mode.",
                  sourceURL = NA)
@@ -144,7 +151,9 @@ doEvent.fireSense_summary = function(sim, eventTime, eventType) {
       ## the module has no studyArea, so an unnamed study area is named after its template raster
       if (is.na(P(sim)$.studyAreaName) && !is.null(sim$rasterToMatch))
         P(sim)$.studyAreaName <- reproducible::.robustDigest(sim$rasterToMatch, algo = "xxhash64")
-      if (P(sim)$mode == "single") {
+      if (P(sim)$mode == "ELFmap") {
+        sim <- reportedELFsMap(sim)
+      } else if (P(sim)$mode == "single") {
         sim <- scheduleEvent(sim, end(sim), "fireSense_summary", "save_single", .last())
         if (!is.na(P(sim)$hindcastYear)) {
           sim <- scheduleEvent(sim, start(sim), "fireSense_summary", "hindcastRecord", .last())
@@ -407,6 +416,26 @@ nfdbShapefiles <- function(dst) {
   nfdb_url <- "https://cwfis.cfs.nrcan.gc.ca/downloads/nfdb/fire_poly/current_version/NFDB_poly.zip"
   files <- reproducible::prepInputs(url = nfdb_url, destinationPath = dst, fun = NA)
   grep("NFDB_poly_(1972to2020|2021to2024).*[.]shp$", files, value = TRUE)
+}
+
+#' Map of Canada's ELFs with `reportedELFs` filled green (mode = 'ELFmap')
+#'
+#' Through `Plots()` with `fireSenseUtils::plotELFs()`, labelled by code, to `simOutputPath` as `ELFmap`.
+#' `sim$ELFs` already has fireSense_ELFs' merges applied, so no merge plan is applied again, and no ELF
+#' is shaded as few-fire or not fitted: only the reported ones are filled.
+#'
+#' @param sim A `simList`.
+#'
+#' @return The `simList`, invisibly.
+reportedELFsMap <- function(sim) {
+  if (is.null(sim$ELFs)) stop("fireSense_summary mode = 'ELFmap' needs `ELFs` (fireSense_ELFs' output)")
+  Plots(fn = fireSenseUtils::plotELFs, ELFs = sim$ELFs, which = P(sim)$reportedELFs, fill = "green",
+        plan = data.frame(ELF = character(0), action = character(0)),
+        fewFires = character(0), fewFiresFill = NA, arcticFill = NA,
+        labels = "code", labelWhich = "highlighted", buffers = FALSE, axes = "none",
+        filename = "ELFmap", path = P(sim)$simOutputPath, types = P(sim)$.plots,
+        deviceArgs = list(width = 10, height = 7.5, units = "in", res = 100))
+  invisible(sim)
 }
 
 #' Find the replicate output files and the historical fires (multi mode)
