@@ -126,6 +126,16 @@ test_that("an existing SIZE_HA column is preserved, not recomputed", {
   expect_equal(modOf(s)$firePolys$SIZE_HA, c(1, 2))
 })
 
+test_that("NFDB polygons, with SIZE_HA and no POLY_HA, get POLY_HA from their area", {
+  ## fireSenseUtils::plotHistoricFires() sums POLY_HA, the polygon area that fireSenseUtils::getFirePolygons()
+  ## adds. The NFDB polygons this module reads itself have only SIZE_HA, so multi mode without supplied
+  ## firePolys stopped with "object 'POLY_HA' not found".
+  s <- runInitMulti(makeMultiSim(firePolys = toyFirePolys("SIZE_HA")))
+  fp <- modOf(s)$firePolys
+  expect_equal(fp$POLY_HA, c(1, 1)) ## 100 m x 100 m
+  expect_equal(fp$SIZE_HA, c(111, 222))
+})
+
 test_that("supplied ignitionFirePoints are passed through untouched", {
   ## The alternative branch downloads the NFDB, so supplying them must short-circuit
   ## it; if it stopped doing so CI would hang or fail on the network.

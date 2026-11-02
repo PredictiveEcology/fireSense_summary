@@ -1,5 +1,7 @@
 # fireSense_summary (development version)
 
+- Multi mode without supplied `firePolys` stopped in `init` with "object 'POLY_HA' not found": the NFDB polygons it reads have `SIZE_HA` only, and `fireSenseUtils::plotHistoricFires()` sums `POLY_HA`. `POLY_HA` is now the polygon area when absent, as `fireSenseUtils::getFirePolygons()` sets it.
+
 - New parameter `fireCauses` (default `fireSenseUtils::fireSenseFireCauses`, `c("natural", "unknown")`, as in `fireSense_dataPrepFit`), passed to `fireSenseUtils::hindcastObserved()`, so the observed ignitions, escapes and area burned have the causes the model was fitted to. `init` checks it against the other modules with `SpaDES.core::paramCheckOtherMods()` and errors if they differ; `NULL` is no longer the default. Needs fireSenseUtils with `fireCauseCodes()` (Depends-on: PredictiveEcology/fireSenseUtils#193).
 
 - The hindcast passes `flammableRTM` (new optional input, from `fireSense_burn`) to `fireSenseUtils::hindcastObserved()`, so the observed area burned and fire sizes are counted on the pixels the simulation can burn, as the simulated ones are. The polygon-area values are also written (`*Polygon` columns of `hindcast_observed.csv`). The hindcast stops if `flammableRTM` is missing. Needs fireSenseUtils#190.

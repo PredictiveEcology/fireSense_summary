@@ -535,6 +535,12 @@ InitMulti <- function(sim) {
     }
   }
 
+  ## plotHistoricFires() also sums POLY_HA, the polygon area that fireSenseUtils::getFirePolygons() adds;
+  ## the NFDB polygons read above have only SIZE_HA
+  if (!"POLY_HA" %in% names(mod$firePolys)) {
+    mod$firePolys$POLY_HA <- round(terra::expanse(mod$firePolys, unit = "ha"), 2)
+  }
+
   ## NFDB points, harmonised and clipped to the template raster by fireregimetools (the URL this
   ## module used to hard-code, .../NFDB_point.zip, returns 404 now)
   mod$ignitionFirePoints <- if (exists("ignitionFirePoints", envir(sim))) {
