@@ -141,6 +141,8 @@ doEvent.fireSense_summary = function(sim, eventTime, eventType) {
         if (is.na(P(sim)$.studyAreaName))
           P(sim)$.studyAreaName <- oldStudyAreaName
       }
+      ## the metrics row names a run by the user's `.studyAreaName`, not the stand-in name below
+      mod$studyAreaNamed <- !is.na(P(sim)$.studyAreaName)
       ## the module has no studyArea, so an unnamed study area is named after its template raster
       if (is.na(P(sim)$.studyAreaName) && !is.null(sim$rasterToMatch))
         P(sim)$.studyAreaName <- reproducible::.robustDigest(sim$rasterToMatch, algo = "xxhash64")
@@ -318,10 +320,11 @@ writeRunMetrics <- function(sim, observed = NULL) {
   runName <- P(sim)$.runName
   if (is.na(runName)) runName <- basename(outputPath(sim))
   ledgers <- fitLedgerFiles(sim)
-  ## one row: a run over several ELFs (a studyAreaLarge, whose `.ELFind` fireSense_ELFs makes all of them)
-  ## names them all in one, which is not an ELF name (merged ELFs are joined by "_")
-  row <- data.table::data.table(runName = runName,
-                                ELF = if (is.null(sim$.ELFind)) NA_character_ else paste(sim$.ELFind, collapse = ", "),
+  ## one row, named by `.studyAreaName`; without one, a run over several ELFs (a studyAreaLarge, whose `.ELFind`
+  ## fireSense_ELFs makes all of them) names them all in one, which is not an ELF name (merged ELFs are joined by "_")
+  ELF <- if (isTRUE(mod$studyAreaNamed)) P(sim)$.studyAreaName else
+    if (is.null(sim$.ELFind)) NA_character_ else paste(sim$.ELFind, collapse = ", ")
+  row <- data.table::data.table(runName = runName, ELF = ELF,
                                 spreadFitFile = ledgers[["spread"]], ignitionFitFile = ledgers[["ignition"]])
   if (is.null(observed)) {
     burn <- params(sim)$fireSense_burn
