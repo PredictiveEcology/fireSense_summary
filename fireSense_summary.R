@@ -318,7 +318,10 @@ writeRunMetrics <- function(sim, observed = NULL) {
   runName <- P(sim)$.runName
   if (is.na(runName)) runName <- basename(outputPath(sim))
   ledgers <- fitLedgerFiles(sim)
-  row <- data.table::data.table(runName = runName, ELF = if (is.null(sim$.ELFind)) NA_character_ else sim$.ELFind,
+  ## one row: a run over several ELFs (a studyAreaLarge, whose `.ELFind` fireSense_ELFs makes all of them)
+  ## names them all in one, which is not an ELF name (merged ELFs are joined by "_")
+  row <- data.table::data.table(runName = runName,
+                                ELF = if (is.null(sim$.ELFind)) NA_character_ else paste(sim$.ELFind, collapse = ", "),
                                 spreadFitFile = ledgers[["spread"]], ignitionFitFile = ledgers[["ignition"]])
   if (is.null(observed)) {
     burn <- params(sim)$fireSense_burn

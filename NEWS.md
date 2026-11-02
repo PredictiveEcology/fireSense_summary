@@ -1,5 +1,7 @@
 # fireSense_summary (development version)
 
+* A run over several ELFs (`.ELFind` of a `studyAreaLarge` names them all) writes one metrics row, its `ELF` naming them all (`"6.6.1, 6.6.2"`); it wrote one row per ELF, each with the run's whole metrics.
+
 - New parameter `fireCauses` (default `fireSenseUtils::fireSenseFireCauses`, `c("natural", "unknown")`, as in `fireSense_dataPrepFit`), passed to `fireSenseUtils::hindcastObserved()`, so the observed ignitions, escapes and area burned have the causes the model was fitted to. `init` checks it against the other modules with `SpaDES.core::paramCheckOtherMods()` and errors if they differ; `NULL` is no longer the default. Needs fireSenseUtils with `fireCauseCodes()` (Depends-on: PredictiveEcology/fireSenseUtils#193).
 
 - The hindcast passes `flammableRTM` (new optional input, from `fireSense_burn`) to `fireSenseUtils::hindcastObserved()`, so the observed area burned and fire sizes are counted on the pixels the simulation can burn, as the simulated ones are. The polygon-area values are also written (`*Polygon` columns of `hindcast_observed.csv`). The hindcast stops if `flammableRTM` is missing. Needs fireSenseUtils#190.

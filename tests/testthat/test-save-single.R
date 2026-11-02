@@ -142,6 +142,15 @@ test_that("the metrics row names the run, the ELF and the fits, then fires and a
   expect_equal(row$areaBurnedHaPerYear, 40)
 })
 
+test_that("a run over several ELFs still writes one metrics row, naming all of them", {
+  s <- makeSingleSim(.ELFind = c("6.6.1", "6.6.2"))
+  SpaDES.core::spades(s, debug = FALSE)
+  out <- SpaDES.core::outputPath(s)
+  row <- data.table::fread(file.path(out, paste0("ELFmetrics_", basename(out), ".csv")))
+  expect_identical(NROW(row), 1L)       # was 2: data.table() recycled the other columns over .ELFind
+  expect_identical(row$ELF, "6.6.1, 6.6.2")
+})
+
 test_that("without the fit modules the ledger files are NA, and the run is named after outputPath", {
   s <- makeSingleSim()
   SpaDES.core::spades(s, debug = FALSE)
