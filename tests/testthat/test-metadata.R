@@ -44,7 +44,7 @@ test_that("parameters are the expected names", {
   expect_identical(
     sort(md$parameters$paramName),
     sort(c(".neverCache", ".runName", ".studyAreaName", "climateScenario", "escapeSizeHa", "fireCauses", "hindcastInterval",
-           "hindcastYear", "mode", "nrvComparisonPath", "reportedELFs", "reps", "simOutputPath", "years"))
+           "hindcastYear", "historicYears", "mode", "nrvComparisonPath", "reportedELFs", "reps", "simOutputPath", "years"))
   )
 })
 
@@ -63,7 +63,7 @@ test_that("parameter classes and defaults are as declared", {
   expect_identical(
     stats::setNames(unlist(p$paramClass), p$paramName),
     c(.neverCache = "character", .runName = "character", .studyAreaName = "character", climateScenario = "character", escapeSizeHa = "numeric", fireCauses = "character", hindcastInterval = "numeric",
-      hindcastYear = "integer", mode = "character", nrvComparisonPath = "character", reportedELFs = "character", reps = "integer",
+      hindcastYear = "integer", historicYears = "integer", mode = "character", nrvComparisonPath = "character", reportedELFs = "character", reps = "integer",
       simOutputPath = "character", years = "integer")
   )
   dflt <- stats::setNames(p$default, p$paramName)
@@ -76,6 +76,7 @@ test_that("parameter classes and defaults are as declared", {
   ## no hindcast unless asked, and whole-year steps between rep-years if it is
   expect_true(is.na(dflt$hindcastYear))
   expect_identical(dflt$hindcastInterval, 1)
+  expect_identical(dflt$historicYears, c(NA_integer_, NA_integer_))
   expect_true(is.na(dflt$.studyAreaName))
   expect_true(is.na(dflt$.runName))
 })

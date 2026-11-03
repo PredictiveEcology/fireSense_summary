@@ -8,7 +8,7 @@ makeMultiSim <- function(firePolys = toyFirePolys(), outputsDF = NULL, reps = 1L
                          years = c(NA_integer_, NA_integer_),
                          times = list(start = 2011, end = 2013),
                          simOutputPath = NULL, objects = list(),
-                         ignitionFirePoints = toyIgnitionPoints()) {
+                         ignitionFirePoints = toyIgnitionPoints(), params = list()) {
   out <- withr::local_tempdir(.local_envir = parent.frame())
   if (is.null(simOutputPath)) simOutputPath <- out
   if (is.null(outputsDF)) {
@@ -29,10 +29,10 @@ makeMultiSim <- function(firePolys = toyFirePolys(), outputsDF = NULL, reps = 1L
   if (!is.null(firePolys)) objs$firePolys <- firePolys
   SpaDES.core::simInit(
     times = times,
-    params = list(fireSense_summary = list(
+    params = list(fireSense_summary = c(list(
       mode = "multi", reps = reps, simOutputPath = simOutputPath,
       .studyAreaName = "toySA", years = years
-    )),
+    ), params)),
     modules = "fireSense_summary",
     objects = objs,
     paths = list(modulePath = modulePath, outputPath = out,
@@ -181,4 +181,37 @@ test_that("without ignitionFirePoints they come from fireregimetools, not a hard
   expect_equal(terra::ext(got$study_area), terra::ext(toyRTM()))
   expect_s4_class(modOf(s)$ignitionFirePoints, "SpatVector")
   expect_equal(modOf(s)$ignitionFirePoints$YEAR, c(1990L, 1991L))
+})
+
+## The observed record of the NRV page is the area burned inside the ELF, over the observed years. The national
+## NFDB shapefiles were passed on whole: fires of all Canada (annual areas of 1e7 ha for one ELF) and fires with a
+## missing year (read as -10000) in the figure.
+toyPolysOutsideAndOdd <- function() {
+  sq <- function(x0, y0, w, yr, ha) {
+    p <- terra::vect(sprintf("POLYGON ((%1$f %2$f, %3$f %2$f, %3$f %4$f, %1$f %4$f, %1$f %2$f))",
+                             x0, y0, x0 + w, y0 + w), crs = "EPSG:3978")
+    p$YEAR <- yr
+    p$SIZE_HA <- ha
+    p
+  }
+  list(sq(0, 0, 100, 1990L, 111),          # inside the template
+       sq(300, 300, 200, 1991L, 4),        # half of its area inside (the template ends at 400): 1 ha of 4
+       sq(5000, 5000, 100, 1992L, 50),     # elsewhere in Canada
+       sq(0, 0, 100, -10000L, 1),          # no year
+       sq(100, 100, 100, 1950L, 1))        # before the record
+}
+
+test_that("observed fires are clipped to the template and their area is the area inside", {
+  s <- runInitMulti(makeMultiSim(firePolys = toyPolysOutsideAndOdd(),
+                                 params = list(historicYears = c(1985L, 2024L))))
+  fp <- modOf(s)$firePolys
+  expect_setequal(fp$YEAR, c(1990L, 1991L))
+  expect_equal(fp$SIZE_HA[fp$YEAR == 1990L], 111)  # wholly inside: the recorded size stays
+  expect_equal(fp$SIZE_HA[fp$YEAR == 1991L], 1, tolerance = 1e-3)  # only 100 m x 100 m of it is inside
+})
+
+test_that("without historicYears, years that are not years are still dropped", {
+  s <- runInitMulti(makeMultiSim(firePolys = toyPolysOutsideAndOdd()))
+  expect_false(any(modOf(s)$firePolys$YEAR <= 0))
+  expect_true(1950L %in% modOf(s)$firePolys$YEAR)
 })

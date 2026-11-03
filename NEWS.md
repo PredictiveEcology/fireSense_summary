@@ -1,5 +1,7 @@
 # fireSense_summary (development version)
 
+- New parameter `historicYears` (multi mode), as in `burnSummaries`. The observed fires (`firePolys`, or the NFDB polygons the module downloads) are now cut to the study area, a fire cut by its edge having its `SIZE_HA` (and `POLY_HA`) set to the area inside, and restricted to `historicYears`; fires with no valid year (the NFDB codes a missing one as -10000) are always left out. The observed annual area burned in `fireSenseUtils::plotHistoricFires()` was that of all Canada (1.5e7 ha for one ELF), with a point at year -10000.
+
 - New mode `"ELFmap"` with parameter `reportedELFs`: draws only the map of Canada's ELFs, the reported ones filled green (`fireSenseUtils::plotELFs()` through `Plots()`), from the `ELFs` input. For a multi-ELF report, e.g. the NRV page, redrawn as ELFs are added.
 
 - Mode `"ELFmap"` with the new parameter `nrvComparisonPath` (a folder with one subfolder per ELF holding NRV_summary's `lm_nrvComparison.csv` and `st_nrvComparison.csv`) colours each reported ELF red to green by the percentage of its NRV tests inside the natural range (`nrvInsideTable()`; `lead_` tree types with `current` and `hi` both 0 are not tests, as on the NRV page) and writes the table as `ELFmap_insideNRV.csv`. An ELF missing either table is warned about and not filled. `NA` (default): green as before. Needs fireSenseUtils with the `metricCol`, `metricRange` and `metricTitle` arguments of `plotELFs()` (Depends-on: PredictiveEcology/fireSenseUtils, plotELFs metricCol PR).

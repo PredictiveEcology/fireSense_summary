@@ -31,6 +31,10 @@ defineModule(sim, list(
     defineParameter("climateScenario", "character", NA, NA, NA,
                     desc = paste("Name of the CMIP6 climate scenario including SSP, formatted as in `ClimateNA`,",
                                  "e.g. 'CanESM5_SSP370'. Used in figure filenames (multi mode).")),
+    defineParameter("historicYears", "integer", c(NA_integer_, NA_integer_), NA, NA,
+                    desc = paste("(multi mode) first and last year of the observed fire record the simulations are compared with,",
+                                 "e.g. c(1985L, 2024L). Fires of other years are left out. `NA`: every year of the record.",
+                                 "Fires with no valid year (`YEAR` 0 or less, as the NFDB codes a missing one) are always left out.")),
     defineParameter("mode", "character", "single", NA, NA,
                     paste("'single': run within a simulation, saving `burnMap` and `burnSummary` at `end(sim)`.",
                           "'multi': summarize the saved outputs of several replicates in figures.",
@@ -570,32 +574,30 @@ InitMulti <- function(sim) {
   ## get historical fire points and polys -------------------------------------------
 
   ## TODO: use an updated/working prepInputs version (fireSenseUtils::getFirePolygons?)
-  if (exists("firePolys", envir(sim))) {
-    mod$firePolys <- sim$firePolys |>
+  firePolys <- if (exists("firePolys", envir(sim))) {
+    sim$firePolys |>
       tidyterra::bind_spat_rows() |>
       tidyterra::mutate(
         YEAR = as.integer(YEAR)
       )
   } else {
-    mod$firePolys <- {
-      nfdb_shp <- nfdbShapefiles(inputPath(sim))
+    nfdb_shp <- nfdbShapefiles(inputPath(sim))
 
-      purrr::map(.x = nfdb_shp, .f = function(x) {
-        p <- terra::vect(x)
+    purrr::map(.x = nfdb_shp, .f = function(x) {
+      p <- terra::vect(x)
 
-        ## NOTE: terra::makeValid takes so long;
-        ## just drop the tiny number of invalid geometries
-        p[terra::is.valid(p), ]
-      }) |>
-        tidyterra::bind_spat_rows() |>
-        tidyterra::mutate(
-          YEAR = as.integer(YEAR),
-          MONTH = as.integer(MONTH),
-          DAY = as.integer(DAY)
-        ) |>
-        terra::project(sim$rasterToMatch)
-    }
+      ## NOTE: terra::makeValid takes so long;
+      ## just drop the tiny number of invalid geometries
+      p[terra::is.valid(p), ]
+    }) |>
+      tidyterra::bind_spat_rows() |>
+      tidyterra::mutate(
+        YEAR = as.integer(YEAR),
+        MONTH = as.integer(MONTH),
+        DAY = as.integer(DAY)
+      )
   }
+  mod$firePolys <- observedFirePolys(firePolys, sim$rasterToMatch, P(sim)$historicYears)
 
   ## NFDB points, harmonised and clipped to the template raster by fireregimetools (the URL this
   ## module used to hard-code, .../NFDB_point.zip, returns 404 now)
@@ -606,6 +608,36 @@ InitMulti <- function(sim) {
   }
 
   return(invisible(sim))
+}
+
+#' The observed fires inside the study area, in the observed years
+#'
+#' The NFDB shapefiles hold the fires of all Canada, with a missing year coded as a number (-10000 was in the
+#' figure). The annual area burned compared with the simulations is that inside the study area, so the fires
+#' are cut to the footprint of `rasterToMatch`; a fire cut by its edge has its `SIZE_HA` (and `POLY_HA`, if present) set to the area inside.
+#'
+#' @param firePolys A `SpatVector` of fires with `YEAR` and `SIZE_HA`.
+#' @param rasterToMatch A `SpatRaster`; its non-`NA` cells are the study area.
+#' @param historicYears `c(first, last)` year to keep, or `NA`s for all years with a valid (positive) year.
+#'
+#' @return A `SpatVector`, in the CRS of `rasterToMatch`.
+observedFirePolys <- function(firePolys, rasterToMatch, historicYears = c(NA_integer_, NA_integer_)) {
+  keep <- !is.na(firePolys$YEAR) & firePolys$YEAR > 0
+  if (!anyNA(historicYears))
+    keep <- keep & firePolys$YEAR >= historicYears[1] & firePolys$YEAR <= historicYears[2]
+  firePolys <- terra::project(firePolys[keep, ], rasterToMatch)
+
+  ## a fire cut by the study area keeps only the area inside; one wholly inside keeps its recorded size
+  firePolys$.fire <- seq_len(nrow(firePolys))
+  haWhole <- terra::expanse(firePolys, unit = "ha")
+  firePolys <- terra::crop(firePolys, terra::as.polygons(rasterToMatch > -Inf))
+  haInside <- terra::expanse(firePolys, unit = "ha")
+  cut <- haInside < haWhole[firePolys$.fire] * (1 - 1e-3)
+  for (col in intersect(c("SIZE_HA", "POLY_HA"), names(firePolys))) {
+    firePolys[[col]][cut, ] <- haInside[cut]
+  }
+  firePolys$.fire <- NULL
+  firePolys
 }
 
 #' No default inputs
