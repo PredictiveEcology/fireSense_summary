@@ -1,5 +1,9 @@
 # fireSense_summary (development version)
 
+- New mode `"ELFmap"` with parameter `reportedELFs`: draws only the map of Canada's ELFs, the reported ones filled green (`fireSenseUtils::plotELFs()` through `Plots()`), from the `ELFs` input. For a multi-ELF report, e.g. the NRV page, redrawn as ELFs are added.
+
+- Mode `"ELFmap"` with the new parameter `nrvComparisonPath` (a folder with one subfolder per ELF holding NRV_summary's `lm_nrvComparison.csv` and `st_nrvComparison.csv`) colours each reported ELF red to green by the percentage of its NRV tests inside the natural range (`nrvInsideTable()`; `lead_` tree types with `current` and `hi` both 0 are not tests, as on the NRV page) and writes the table as `ELFmap_insideNRV.csv`. An ELF missing either table is warned about and not filled. `NA` (default): green as before. Needs fireSenseUtils with the `metricCol`, `metricRange` and `metricTitle` arguments of `plotELFs()` (Depends-on: PredictiveEcology/fireSenseUtils, plotELFs metricCol PR).
+
 * A run over several ELFs (`.ELFind` of a `studyAreaLarge` names them all) writes one metrics row; it wrote one row per ELF, each with the run's whole metrics. The row's `ELF` is the run's `.studyAreaName`, or, when that is not set, all its ELFs (`"6.6.1, 6.6.2"`).
 
 - `SIZE_HA` is the one fire-size column. The block that copied `ADJ_HA` or `POLY_HA` into `SIZE_HA` before `plotHistoricFires()` is gone: `fireSenseUtils::plotHistoricFires()` now reads `SIZE_HA` alone. The NFDB polygons the module downloads itself already carry `SIZE_HA`; supplied `firePolys` must too (as `fireregimetools` and `fireSenseUtils::getFirePolygons()` give). Needs `fireSenseUtils` >= 0.2.3.9145.
