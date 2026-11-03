@@ -1683,7 +1683,7 @@ National Fire Database.</p>
 <col width="1%" />
 <col width="0%" />
 <col width="0%" />
-<col width="91%" />
+<col width="90%" />
 <col width="1%" />
 </colgroup>
 <thead>
@@ -1731,7 +1731,37 @@ figure filenames (multi mode).</td>
 <td align="left">‘single’: run within a simulation, saving
 <code>burnMap</code> and <code>burnSummary</code> at
 <code>end(sim)</code>. ‘multi’: summarize the saved outputs of several
-replicates in figures.</td>
+replicates in figures. ‘ELFmap’: draw only the map of Canada’s ELFs with
+<code>reportedELFs</code> filled, from <code>ELFs</code> (e.g. the ELFs
+a multi-ELF report covers): green, or, with
+<code>nrvComparisonPath</code>, coloured by the percentage of the ELF’s
+NRV tests inside the natural range; written to
+<code>simOutputPath</code> as ELFmap.</td>
+<td align="left">TRUE</td>
+</tr>
+<tr class="even">
+<td align="left">nrvComparisonPath</td>
+<td align="left">character</td>
+<td align="left">NA</td>
+<td align="left">NA</td>
+<td align="left">NA</td>
+<td align="left">(mode = ‘ELFmap’) folder with one subfolder per
+reported ELF, each holding below it NRV_summary’s
+<code>lm_nrvComparison.csv</code> and <code>st_nrvComparison.csv</code>.
+The ELFs are coloured by the percentage of those tests inside the NRV
+(red none, green all) and the table is written to
+<code>simOutputPath</code> as <code>ELFmap_insideNRV.csv</code>.
+<code>NA</code>: the ELFs are filled green.</td>
+<td align="left">TRUE</td>
+</tr>
+<tr class="odd">
+<td align="left">reportedELFs</td>
+<td align="left">character</td>
+<td align="left">NA</td>
+<td align="left">NA</td>
+<td align="left">NA</td>
+<td align="left">(mode = ‘ELFmap’) the ELFs filled (and labelled) on the
+map, e.g. c(“6.4”, “9.3”).</td>
 <td align="left">TRUE</td>
 </tr>
 <tr class="even">
@@ -1985,6 +2015,14 @@ its metrics row.</td>
 <td align="left">NA</td>
 </tr>
 <tr class="odd">
+<td align="left">ELFs</td>
+<td align="left">list</td>
+<td align="left">Required in mode ‘ELFmap’. All ELFs as fireSense_ELFs
+leaves them (merges applied): a list with <code>rasWhole</code>,
+<code>rasCentered</code> and, if present, <code>poly</code>.</td>
+<td align="left">NA</td>
+</tr>
+<tr class="even">
 <td align="left">rasterToMatch</td>
 <td align="left">SpatRaster</td>
 <td align="left">Template raster of the simulations. Required in multi
