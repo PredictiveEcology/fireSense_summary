@@ -42,7 +42,7 @@ mySim <- simInit(
   params = list(fireSense_summary = list(
     mode = "multi",
     simOutputPath = "outputs/myStudyArea", ## holds rep01/, rep02/, ...
-    studyAreaName = "myStudyArea",
+    .studyAreaName = "myStudyArea",
     climateScenario = "CanESM5_SSP370",
     reps = 1L:10L
   )),

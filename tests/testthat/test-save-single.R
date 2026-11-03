@@ -39,6 +39,24 @@ test_that("single mode writes the burn map, summary and metrics row, named for e
   expect_equal(dt$sizeHa, c(10, 20, 30))
 })
 
+test_that("a run without fire writes an empty burn summary", {
+  ## fireSense_burn leaves burnSummary NULL when nothing burned; a one-year hindcast run
+  ## without fire failed here (fwrite: is.list(x) is not TRUE)
+  out <- withr::local_tempdir()
+  s <- SpaDES.core::simInit(
+    times = list(start = 2011, end = 2011),
+    params = list(fireSense_summary = list(mode = "single")),
+    modules = "fireSense_summary",
+    objects = list(burnMap = toyBurnMap()),
+    paths = list(modulePath = modulePath, outputPath = out,
+                 cachePath = file.path(out, "cache"), inputPath = file.path(out, "in"))
+  )
+  SpaDES.core::spades(s, debug = FALSE)
+  f <- file.path(out, "fireSense_burnSummary.csv")
+  expect_true(file.exists(f))
+  expect_identical(NROW(suppressWarnings(data.table::fread(f))), 0L)
+})
+
 test_that("all written files are registered in outputs(sim)", {
   ## registerOutputs() is what makes these files discoverable by a later multi-mode
   ## run via `outputsDF`; if it stops happening the summary silently sees nothing.
@@ -82,9 +100,7 @@ test_that("single-mode init schedules exactly one save_single at end(sim)", {
   ## inside init) and so must never write burn maps.
   s <- makeSingleSim()
   before <- SpaDES.core::events(s)
-  after <- SpaDES.core::events(
-    s$.mods$fireSense_summary$doEvent.fireSense_summary(s, SpaDES.core::start(s), "init")
-  )
+  after <- SpaDES.core::events(runInit(s))
   added <- after[!after$eventType %in% before$eventType, ]
   expect_identical(NROW(added), 1L)
   expect_identical(added$eventType, "save_single")
@@ -124,6 +140,24 @@ test_that("the metrics row names the run, the ELF and the fits, then fires and a
   expect_equal(row$burnYears, 3)                                                       # 2011, 2012, 2013
   expect_equal(row$firesPerYear, 4 / 3)
   expect_equal(row$areaBurnedHaPerYear, 40)
+})
+
+test_that("a run over several ELFs still writes one metrics row, naming all of them", {
+  s <- makeSingleSim(.ELFind = c("6.6.1", "6.6.2"))
+  SpaDES.core::spades(s, debug = FALSE)
+  out <- SpaDES.core::outputPath(s)
+  row <- data.table::fread(file.path(out, paste0("ELFmetrics_", basename(out), ".csv")))
+  expect_identical(NROW(row), 1L)       # was 2: data.table() recycled the other columns over .ELFind
+  expect_identical(row$ELF, "6.6.1, 6.6.2")
+})
+
+test_that("a run with a .studyAreaName is named by it in its metrics row, not by its ELFs", {
+  s <- makeSingleSim(.ELFind = c("6.6.1", "6.6.2"))
+  SpaDES.core::params(s)$fireSense_summary$.studyAreaName <- "Mixedwood Plains"
+  SpaDES.core::spades(s, debug = FALSE)
+  out <- SpaDES.core::outputPath(s)
+  row <- data.table::fread(file.path(out, paste0("ELFmetrics_", basename(out), ".csv")))
+  expect_identical(row$ELF, "Mixedwood Plains")
 })
 
 test_that("without the fit modules the ledger files are NA, and the run is named after outputPath", {
