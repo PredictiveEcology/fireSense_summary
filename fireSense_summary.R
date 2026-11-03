@@ -9,7 +9,7 @@ defineModule(sim, list(
     person("Ian MS", "Eddy", email = "ian.eddy@nrcan-rncan.gc.ca", role = "aut")
   ),
   childModules = character(0),
-  version = list(fireSense_summary = "1.1.0.9010"),
+  version = list(fireSense_summary = "1.1.0.9012"),
   timeframe = as.POSIXlt(c(NA, NA)),
   timeunit = "year",
   citation = list("citation.bib"),
@@ -20,7 +20,7 @@ defineModule(sim, list(
     "FOR-CAST/fireregimetools@main (>= 0.1.0.9001)", ## fetch_nfdb_points()
     "purrr", "qs2", "RColorBrewer", "reproducible", "terra", "tidyterra",
     "raster", "rasterVis", ## TODO: remove these once fireSenseUtils::plotCumulativeBurns switched to ggplot2/tidyterra
-    "PredictiveEcology/fireSenseUtils@development (>= 0.2.3.9144)", ## plotELFs(metrics, metric, metricCol, metricRange, metricTitle); fireSenseFireCauses; fireCauseCodes() via hindcastObserved(fireCauses); hindcast*(); hindcastObserved()$points, flammableRTM; ELFmetricsFilename(); escapes from burned-area polygons (#187)
+    "PredictiveEcology/fireSenseUtils@development (>= 0.2.3.9145)", ## plotELFs(metrics, metric, metricCol, metricRange, metricTitle) (9144); plotHistoricFires(sizeCol = "SIZE_HA"); fireSenseFireCauses; fireCauseCodes() via hindcastObserved(fireCauses); hindcast*(); hindcastObserved()$points, flammableRTM; ELFmetricsFilename(); escapes from burned-area polygons (#187)
     "PredictiveEcology/SpaDES.core@development (>= 3.2.1.9038)", ## dirnamesFromSet(leafOnly = FALSE) returns the rep folder, resolveSimYears(), padYears()
     "PredictiveEcology/SpaDES.tools@development (>= 2.1.1.9000)"
   ),
@@ -154,6 +154,8 @@ doEvent.fireSense_summary = function(sim, eventTime, eventType) {
         if (is.na(P(sim)$.studyAreaName))
           P(sim)$.studyAreaName <- oldStudyAreaName
       }
+      ## the metrics row names a run by the user's `.studyAreaName`, not the stand-in name below
+      mod$studyAreaNamed <- !is.na(P(sim)$.studyAreaName)
       ## the module has no studyArea, so an unnamed study area is named after its template raster
       if (is.na(P(sim)$.studyAreaName) && !is.null(sim$rasterToMatch))
         P(sim)$.studyAreaName <- reproducible::.robustDigest(sim$rasterToMatch, algo = "xxhash64")
@@ -333,7 +335,11 @@ writeRunMetrics <- function(sim, observed = NULL) {
   runName <- P(sim)$.runName
   if (is.na(runName)) runName <- basename(outputPath(sim))
   ledgers <- fitLedgerFiles(sim)
-  row <- data.table::data.table(runName = runName, ELF = if (is.null(sim$.ELFind)) NA_character_ else sim$.ELFind,
+  ## one row, named by `.studyAreaName`; without one, a run over several ELFs (a studyAreaLarge, whose `.ELFind`
+  ## fireSense_ELFs makes all of them) names them all in one, which is not an ELF name (merged ELFs are joined by "_")
+  ELF <- if (isTRUE(mod$studyAreaNamed)) P(sim)$.studyAreaName else
+    if (is.null(sim$.ELFind)) NA_character_ else paste(sim$.ELFind, collapse = ", ")
+  row <- data.table::data.table(runName = runName, ELF = ELF,
                                 spreadFitFile = ledgers[["spread"]], ignitionFitFile = ledgers[["ignition"]])
   if (is.null(observed)) {
     burn <- params(sim)$fireSense_burn
@@ -589,31 +595,6 @@ InitMulti <- function(sim) {
         ) |>
         terra::project(sim$rasterToMatch)
     }
-  }
-
-  # plotHistoricFires expects SIZE_HA
-  if (!"SIZE_HA" %in% names(mod$firePolys)) {
-    if ("ADJ_HA" %in% names(mod$firePolys)) {
-      mod$firePolys <- mod$firePolys |>
-        tidyterra::mutate(
-          SIZE_HA = ADJ_HA
-        )
-    } else {
-      ## NOTE: `mod$firePolys`, not `sim$firePolys`: by this point the polygons have
-      ## been bound and typed above, whereas when they were supplied as an input
-      ## `sim$firePolys` is still the *list* of annual SpatVectors, which
-      ## tidyterra::mutate() cannot take.
-      mod$firePolys <- mod$firePolys |>
-        tidyterra::mutate(
-          SIZE_HA = POLY_HA
-        )
-    }
-  }
-
-  ## plotHistoricFires() also sums POLY_HA, the polygon area that fireSenseUtils::getFirePolygons() adds;
-  ## the NFDB polygons read above have only SIZE_HA
-  if (!"POLY_HA" %in% names(mod$firePolys)) {
-    mod$firePolys$POLY_HA <- round(terra::expanse(mod$firePolys, unit = "ha"), 2)
   }
 
   ## NFDB points, harmonised and clipped to the template raster by fireregimetools (the URL this
