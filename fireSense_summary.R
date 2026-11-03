@@ -20,7 +20,7 @@ defineModule(sim, list(
     "FOR-CAST/fireregimetools@main (>= 0.1.0.9001)", ## fetch_nfdb_points()
     "purrr", "qs2", "RColorBrewer", "reproducible", "terra", "tidyterra",
     "raster", "rasterVis", ## TODO: remove these once fireSenseUtils::plotCumulativeBurns switched to ggplot2/tidyterra
-    "PredictiveEcology/fireSenseUtils@development (>= 0.2.3.9135)", ## fireSenseFireCauses; fireCauseCodes() via hindcastObserved(fireCauses); hindcast*(); hindcastObserved()$points, flammableRTM; ELFmetricsFilename(); escapes from burned-area polygons (#187)
+    "PredictiveEcology/fireSenseUtils@development (>= 0.2.3.9142)", ## fireSenseFireCauses; fireCauseCodes() via hindcastObserved(fireCauses); hindcast*(); hindcastObserved()$points, flammableRTM; ELFmetricsFilename(); escapes from burned-area polygons (#187)
     "PredictiveEcology/SpaDES.core@development (>= 3.2.1.9038)", ## dirnamesFromSet(leafOnly = FALSE) returns the rep folder, resolveSimYears(), padYears()
     "PredictiveEcology/SpaDES.tools@development (>= 2.1.1.9000)"
   ),
@@ -141,6 +141,8 @@ doEvent.fireSense_summary = function(sim, eventTime, eventType) {
         if (is.na(P(sim)$.studyAreaName))
           P(sim)$.studyAreaName <- oldStudyAreaName
       }
+      ## the metrics row names a run by the user's `.studyAreaName`, not the stand-in name below
+      mod$studyAreaNamed <- !is.na(P(sim)$.studyAreaName)
       ## the module has no studyArea, so an unnamed study area is named after its template raster
       if (is.na(P(sim)$.studyAreaName) && !is.null(sim$rasterToMatch))
         P(sim)$.studyAreaName <- reproducible::.robustDigest(sim$rasterToMatch, algo = "xxhash64")
@@ -318,7 +320,11 @@ writeRunMetrics <- function(sim, observed = NULL) {
   runName <- P(sim)$.runName
   if (is.na(runName)) runName <- basename(outputPath(sim))
   ledgers <- fitLedgerFiles(sim)
-  row <- data.table::data.table(runName = runName, ELF = if (is.null(sim$.ELFind)) NA_character_ else sim$.ELFind,
+  ## one row, named by `.studyAreaName`; without one, a run over several ELFs (a studyAreaLarge, whose `.ELFind`
+  ## fireSense_ELFs makes all of them) names them all in one, which is not an ELF name (merged ELFs are joined by "_")
+  ELF <- if (isTRUE(mod$studyAreaNamed)) P(sim)$.studyAreaName else
+    if (is.null(sim$.ELFind)) NA_character_ else paste(sim$.ELFind, collapse = ", ")
+  row <- data.table::data.table(runName = runName, ELF = ELF,
                                 spreadFitFile = ledgers[["spread"]], ignitionFitFile = ledgers[["ignition"]])
   if (is.null(observed)) {
     burn <- params(sim)$fireSense_burn
