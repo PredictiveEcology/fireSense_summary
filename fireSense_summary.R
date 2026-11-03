@@ -20,7 +20,7 @@ defineModule(sim, list(
     "FOR-CAST/fireregimetools@main (>= 0.1.0.9001)", ## fetch_nfdb_points()
     "purrr", "qs2", "RColorBrewer", "reproducible", "terra", "tidyterra",
     "raster", "rasterVis", ## TODO: remove these once fireSenseUtils::plotCumulativeBurns switched to ggplot2/tidyterra
-    "PredictiveEcology/fireSenseUtils@development (>= 0.2.3.9135)", ## fireSenseFireCauses; fireCauseCodes() via hindcastObserved(fireCauses); hindcast*(); hindcastObserved()$points, flammableRTM; ELFmetricsFilename(); escapes from burned-area polygons (#187)
+    "PredictiveEcology/fireSenseUtils@development (>= 0.2.3.9144)", ## plotELFs(metrics, metric, metricCol, metricRange, metricTitle); fireSenseFireCauses; fireCauseCodes() via hindcastObserved(fireCauses); hindcast*(); hindcastObserved()$points, flammableRTM; ELFmetricsFilename(); escapes from burned-area polygons (#187)
     "PredictiveEcology/SpaDES.core@development (>= 3.2.1.9038)", ## dirnamesFromSet(leafOnly = FALSE) returns the rep folder, resolveSimYears(), padYears()
     "PredictiveEcology/SpaDES.tools@development (>= 2.1.1.9000)"
   ),
@@ -34,10 +34,16 @@ defineModule(sim, list(
     defineParameter("mode", "character", "single", NA, NA,
                     paste("'single': run within a simulation, saving `burnMap` and `burnSummary` at `end(sim)`.",
                           "'multi': summarize the saved outputs of several replicates in figures.",
-                          "'ELFmap': draw only the map of Canada's ELFs with `reportedELFs` filled green, from `ELFs`",
-                          "(e.g. the ELFs a multi-ELF report covers); written to `simOutputPath` as ELFmap.")),
+                          "'ELFmap': draw only the map of Canada's ELFs with `reportedELFs` filled, from `ELFs`",
+                          "(e.g. the ELFs a multi-ELF report covers): green, or, with `nrvComparisonPath`, coloured by the",
+                          "percentage of the ELF's NRV tests inside the natural range; written to `simOutputPath` as ELFmap.")),
+    defineParameter("nrvComparisonPath", "character", NA_character_, NA, NA,
+                    desc = paste("(mode = 'ELFmap') folder with one subfolder per reported ELF, each holding below it NRV_summary's",
+                                 "`lm_nrvComparison.csv` and `st_nrvComparison.csv`. The ELFs are coloured by the percentage of those",
+                                 "tests inside the NRV (red none, green all) and the table is written to `simOutputPath` as",
+                                 "`ELFmap_insideNRV.csv`. `NA`: the ELFs are filled green.")),
     defineParameter("reportedELFs", "character", NA_character_, NA, NA,
-                    desc = "(mode = 'ELFmap') the ELFs filled green on the map, e.g. c(\"6.4\", \"9.3\")."),
+                    desc = "(mode = 'ELFmap') the ELFs filled (and labelled) on the map, e.g. c(\"6.4\", \"9.3\")."),
     defineParameter("simOutputPath", "character", outputPath(sim), NA, NA,
                     desc = "Directory holding the replicate output directories, and where figures are written (multi mode)."),
     defineParameter(".runName", "character", NA_character_, NA, NA,
@@ -418,23 +424,63 @@ nfdbShapefiles <- function(dst) {
   grep("NFDB_poly_(1972to2020|2021to2024).*[.]shp$", files, value = TRUE)
 }
 
-#' Map of Canada's ELFs with `reportedELFs` filled green (mode = 'ELFmap')
+#' Percentage of each ELF's NRV tests inside the natural range (mode = 'ELFmap')
+#'
+#' Reads `lm_nrvComparison.csv` and `st_nrvComparison.csv` (NRV_summary; columns `poly`, `metric`, `lo`, `hi`,
+#' `mid`, `current`, `position` = "inside", "above" or "below") found anywhere below `<path>/<ELF>/`. As on the
+#' NRV page, `st` rows of a `lead_` metric with `current == 0` and `hi == 0` (a tree type that leads nowhere,
+#' now or in the NRV years) are not tests. An ELF missing either table is warned about and left out.
+#'
+#' @param ELFs Character, the ELFs to read.
+#' @param path Folder with one subfolder per ELF.
+#'
+#' @return A `data.table` with `ELF`, `nTests`, `nInside` and `pctInside` (`100 * nInside / nTests`).
+nrvInsideTable <- function(ELFs, path) {
+  one <- function(elf) {
+    find <- function(f) list.files(file.path(path, elf), f, recursive = TRUE, full.names = TRUE)
+    lm <- find("^lm_nrvComparison[.]csv$"); st <- find("^st_nrvComparison[.]csv$")
+    if (!length(lm) || !length(st)) {
+      warning("ELF ", elf, ": no lm_nrvComparison.csv and st_nrvComparison.csv below ", file.path(path, elf),
+              "; it is left out of the NRV map", call. = FALSE)
+      return(NULL)
+    }
+    lm <- data.table::fread(lm[1]); st <- data.table::fread(st[1])
+    st <- st[!(startsWith(st$metric, "lead_") & st$current == 0 & st$hi == 0), ]
+    position <- c(lm$position, st$position)
+    data.table::data.table(ELF = elf, nTests = length(position), nInside = sum(position == "inside"))
+  }
+  tab <- data.table::rbindlist(lapply(ELFs, one))
+  tab$pctInside <- 100 * tab$nInside / tab$nTests
+  tab
+}
+
+#' Map of Canada's ELFs with `reportedELFs` filled (mode = 'ELFmap')
 #'
 #' Through `Plots()` with `fireSenseUtils::plotELFs()`, labelled by code, to `simOutputPath` as `ELFmap`.
 #' `sim$ELFs` already has fireSense_ELFs' merges applied, so no merge plan is applied again, and no ELF
-#' is shaded as few-fire or not fitted: only the reported ones are filled.
+#' is shaded as few-fire or not fitted: only the reported ones are filled, green, or, with
+#' `nrvComparisonPath`, red to green by `nrvInsideTable()` (also written to `simOutputPath` as
+#' `ELFmap_insideNRV.csv`).
 #'
 #' @param sim A `simList`.
 #'
 #' @return The `simList`, invisibly.
 reportedELFsMap <- function(sim) {
   if (is.null(sim$ELFs)) stop("fireSense_summary mode = 'ELFmap' needs `ELFs` (fireSense_ELFs' output)")
-  Plots(fn = fireSenseUtils::plotELFs, ELFs = sim$ELFs, which = P(sim)$reportedELFs, fill = "green",
-        plan = data.frame(ELF = character(0), action = character(0)),
-        fewFires = character(0), fewFiresFill = NA, arcticFill = NA,
-        labels = "code", labelWhich = "highlighted", buffers = FALSE, axes = "none",
-        filename = "ELFmap", path = P(sim)$simOutputPath, types = P(sim)$.plots,
-        deviceArgs = list(width = 10, height = 7.5, units = "in", res = 100))
+  colouring <- list(fill = "green")
+  if (!is.na(P(sim)$nrvComparisonPath)) {
+    inside <- nrvInsideTable(P(sim)$reportedELFs, P(sim)$nrvComparisonPath)
+    data.table::fwrite(inside, file.path(P(sim)$simOutputPath, "ELFmap_insideNRV.csv"))
+    colouring <- list(metrics = inside, metric = "pctInside", metricCol = grDevices::hcl.colors(100, "RdYlGn"),
+                      metricRange = c(0, 100), metricTitle = "% of tests\ninside the NRV")
+  }
+  do.call(Plots, c(list(fn = fireSenseUtils::plotELFs, ELFs = sim$ELFs, which = P(sim)$reportedELFs),
+                   colouring,
+                   list(plan = data.frame(ELF = character(0), action = character(0)),
+                        fewFires = character(0), fewFiresFill = NA, arcticFill = NA,
+                        labels = "code", labelWhich = "highlighted", buffers = FALSE, axes = "none",
+                        filename = "ELFmap", path = P(sim)$simOutputPath, types = P(sim)$.plots,
+                        deviceArgs = list(width = 10, height = 7.5, units = "in", res = 100))))
   invisible(sim)
 }
 

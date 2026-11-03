@@ -44,7 +44,7 @@ test_that("parameters are the expected names", {
   expect_identical(
     sort(md$parameters$paramName),
     sort(c(".neverCache", ".runName", ".studyAreaName", "climateScenario", "escapeSizeHa", "fireCauses", "hindcastInterval",
-           "hindcastYear", "mode", "reportedELFs", "reps", "simOutputPath", "years"))
+           "hindcastYear", "mode", "nrvComparisonPath", "reportedELFs", "reps", "simOutputPath", "years"))
   )
 })
 
@@ -63,7 +63,7 @@ test_that("parameter classes and defaults are as declared", {
   expect_identical(
     stats::setNames(unlist(p$paramClass), p$paramName),
     c(.neverCache = "character", .runName = "character", .studyAreaName = "character", climateScenario = "character", escapeSizeHa = "numeric", fireCauses = "character", hindcastInterval = "numeric",
-      hindcastYear = "integer", mode = "character", reportedELFs = "character", reps = "integer",
+      hindcastYear = "integer", mode = "character", nrvComparisonPath = "character", reportedELFs = "character", reps = "integer",
       simOutputPath = "character", years = "integer")
   )
   dflt <- stats::setNames(p$default, p$paramName)

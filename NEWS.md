@@ -2,6 +2,8 @@
 
 - New mode `"ELFmap"` with parameter `reportedELFs`: draws only the map of Canada's ELFs, the reported ones filled green (`fireSenseUtils::plotELFs()` through `Plots()`), from the `ELFs` input. For a multi-ELF report, e.g. the NRV page, redrawn as ELFs are added.
 
+- Mode `"ELFmap"` with the new parameter `nrvComparisonPath` (a folder with one subfolder per ELF holding NRV_summary's `lm_nrvComparison.csv` and `st_nrvComparison.csv`) colours each reported ELF red to green by the percentage of its NRV tests inside the natural range (`nrvInsideTable()`; `lead_` tree types with `current` and `hi` both 0 are not tests, as on the NRV page) and writes the table as `ELFmap_insideNRV.csv`. An ELF missing either table is warned about and not filled. `NA` (default): green as before. Needs fireSenseUtils with the `metricCol`, `metricRange` and `metricTitle` arguments of `plotELFs()` (Depends-on: PredictiveEcology/fireSenseUtils, plotELFs metricCol PR).
+
 - Multi mode without supplied `firePolys` stopped in `init` with "object 'POLY_HA' not found": the NFDB polygons it reads have `SIZE_HA` only, and `fireSenseUtils::plotHistoricFires()` sums `POLY_HA`. `POLY_HA` is now the polygon area when absent, as `fireSenseUtils::getFirePolygons()` sets it.
 
 - New parameter `fireCauses` (default `fireSenseUtils::fireSenseFireCauses`, `c("natural", "unknown")`, as in `fireSense_dataPrepFit`), passed to `fireSenseUtils::hindcastObserved()`, so the observed ignitions, escapes and area burned have the causes the model was fitted to. `init` checks it against the other modules with `SpaDES.core::paramCheckOtherMods()` and errors if they differ; `NULL` is no longer the default. Needs fireSenseUtils with `fireCauseCodes()` (Depends-on: PredictiveEcology/fireSenseUtils#193).
