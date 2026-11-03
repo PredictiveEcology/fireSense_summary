@@ -99,31 +99,17 @@ test_that("supplied firePolys are bound into one SpatVector with an integer YEAR
   expect_type(fp$YEAR, "integer")
 })
 
-test_that("SIZE_HA is taken from ADJ_HA when present", {
-  s <- runInitMulti(makeMultiSim(firePolys = toyFirePolys("ADJ_HA")))
-  fp <- modOf(s)$firePolys
-  expect_true("SIZE_HA" %in% names(fp))
-  expect_equal(fp$SIZE_HA, c(111, 222))
-})
-
-test_that("SIZE_HA falls back to POLY_HA, from the bound polygons", {
-  ## Regression test. This branch used to read `sim$firePolys`, which is still the
-  ## *list* of annual SpatVectors the input arrived as, so tidyterra::mutate() failed
-  ## with "no applicable method for 'mutate' applied to an object of class list".
-  ## It now reads `mod$firePolys`, matching the ADJ_HA branch above.
-  s <- runInitMulti(makeMultiSim(firePolys = toyFirePolys("POLY_HA")))
-  fp <- modOf(s)$firePolys
-  expect_s4_class(fp, "SpatVector")
-  expect_equal(fp$SIZE_HA, c(111, 222))
-  expect_equal(fp$SIZE_HA, fp$POLY_HA)
-})
-
-test_that("an existing SIZE_HA column is preserved, not recomputed", {
-  fp <- toyFirePolys("ADJ_HA")
-  fp[[1]]$SIZE_HA <- 1
-  fp[[2]]$SIZE_HA <- 2
+test_that("supplied SIZE_HA is passed through, not recomputed from ADJ_HA or POLY_HA", {
+  fp <- toyFirePolys()
+  fp[[1]]$ADJ_HA <- fp[[1]]$POLY_HA <- 1
+  fp[[2]]$ADJ_HA <- fp[[2]]$POLY_HA <- 2
   s <- runInitMulti(makeMultiSim(firePolys = fp))
-  expect_equal(modOf(s)$firePolys$SIZE_HA, c(1, 2))
+  expect_equal(modOf(s)$firePolys$SIZE_HA, c(111, 222))
+})
+
+test_that("the module adds no size column of its own to supplied polygons", {
+  s <- runInitMulti(makeMultiSim(firePolys = toyFirePolys("ADJ_HA")))
+  expect_false("SIZE_HA" %in% names(modOf(s)$firePolys))
 })
 
 test_that("supplied ignitionFirePoints are passed through untouched", {

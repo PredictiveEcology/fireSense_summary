@@ -20,7 +20,7 @@ defineModule(sim, list(
     "FOR-CAST/fireregimetools@main (>= 0.1.0.9001)", ## fetch_nfdb_points()
     "purrr", "qs2", "RColorBrewer", "reproducible", "terra", "tidyterra",
     "raster", "rasterVis", ## TODO: remove these once fireSenseUtils::plotCumulativeBurns switched to ggplot2/tidyterra
-    "PredictiveEcology/fireSenseUtils@development (>= 0.2.3.9142)", ## fireSenseFireCauses; fireCauseCodes() via hindcastObserved(fireCauses); hindcast*(); hindcastObserved()$points, flammableRTM; ELFmetricsFilename(); escapes from burned-area polygons (#187)
+    "PredictiveEcology/fireSenseUtils@development (>= 0.2.3.9143)", ## plotHistoricFires(sizeCol = "SIZE_HA"); fireSenseFireCauses; fireCauseCodes() via hindcastObserved(fireCauses); hindcast*(); hindcastObserved()$points, flammableRTM; ELFmetricsFilename(); escapes from burned-area polygons (#187)
     "PredictiveEcology/SpaDES.core@development (>= 3.2.1.9038)", ## dirnamesFromSet(leafOnly = FALSE) returns the rep folder, resolveSimYears(), padYears()
     "PredictiveEcology/SpaDES.tools@development (>= 2.1.1.9000)"
   ),
@@ -519,25 +519,6 @@ InitMulti <- function(sim) {
           DAY = as.integer(DAY)
         ) |>
         terra::project(sim$rasterToMatch)
-    }
-  }
-
-  # plotHistoricFires expects SIZE_HA
-  if (!"SIZE_HA" %in% names(mod$firePolys)) {
-    if ("ADJ_HA" %in% names(mod$firePolys)) {
-      mod$firePolys <- mod$firePolys |>
-        tidyterra::mutate(
-          SIZE_HA = ADJ_HA
-        )
-    } else {
-      ## NOTE: `mod$firePolys`, not `sim$firePolys`: by this point the polygons have
-      ## been bound and typed above, whereas when they were supplied as an input
-      ## `sim$firePolys` is still the *list* of annual SpatVectors, which
-      ## tidyterra::mutate() cannot take.
-      mod$firePolys <- mod$firePolys |>
-        tidyterra::mutate(
-          SIZE_HA = POLY_HA
-        )
     }
   }
 
