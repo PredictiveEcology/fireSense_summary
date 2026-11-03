@@ -41,3 +41,4 @@ vignettes/*.pdf
 ## not the module's own rendered .Rmd: the render-module-rmd workflow commits
 ## <module>.html back to the branch, as in every other fireSense module.
 ## `vignettes/*.html` above still covers built vignettes.
+/fireSense_summary.html
