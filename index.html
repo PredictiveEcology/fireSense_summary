@@ -111,12 +111,12 @@
 </h1>
 <table class="table">
 <colgroup>
-<col width="3%">
 <col width="2%">
+<col width="1%">
 <col width="2%">
 <col width="0%">
 <col width="0%">
-<col width="90%">
+<col width="92%">
 </colgroup>
 <thead><tr>
 <th align="left">paramName</th>
@@ -150,6 +150,14 @@
 <td align="left">NA</td>
 <td align="left">NA</td>
 <td align="left">Directory holding the replicate output directories, and where figures are written (multi mode).</td>
+</tr>
+<tr>
+<td align="left">.runName</td>
+<td align="left">character</td>
+<td align="left">NA</td>
+<td align="left">NA</td>
+<td align="left">NA</td>
+<td align="left">Name of this run, e.g. ‘13.1_NRV_370_1’; names its metrics file (<code><a href="https://rdrr.io/pkg/fireSenseUtils/man/ELFmetrics.html" class="external-link">fireSenseUtils::ELFmetricsFilename()</a></code>). <code>NA</code>: the name of <code>outputPath(sim)</code>.</td>
 </tr>
 <tr>
 <td align="left">studyAreaName</td>
@@ -189,7 +197,7 @@
 <td align="left">NA</td>
 <td align="left">NA</td>
 <td align="left">NA</td>
-<td align="left">Hindcast validation: the observed year the simulated rep-years are compared with. <code>NA</code> (default): no hindcast. Single mode records each rep-year and, at <code>end(sim)</code>, writes <code>hindcast_reps.csv</code>, <code>hindcast_sizes.csv</code>, <code>hindcast_observed.csv</code>, <code>hindcast_observedSizes.csv</code>, <code>hindcast_observedPolys.gpkg</code>, <code>hindcast_burnMap.tif</code> and one <code>hindcast_burnID_rep&lt;rep&gt;.tif</code> per rep. Multi mode pools the replicate folders (parameter sets) in hindcast figures instead of the usual multi-mode figures.</td>
+<td align="left">Hindcast validation: the observed year the simulated rep-years are compared with. <code>NA</code> (default): no hindcast. Single mode records each rep-year and, at <code>end(sim)</code>, writes <code>hindcast_reps.csv</code>, <code>hindcast_sizes.csv</code>, <code>hindcast_observed.csv</code>, <code>hindcast_observedSizes.csv</code>, <code>hindcast_observedPolys.gpkg</code>, <code>hindcast_observedPoints.gpkg</code>, <code>hindcast_burnMap.tif</code> and, per rep, <code>hindcast_burnID_rep&lt;rep&gt;.tif</code>, <code>hindcast_ignitionProb_rep&lt;rep&gt;.tif</code> and <code>hindcast_escapeProb_rep&lt;rep&gt;.tif</code>. Multi mode pools the replicate folders (parameter sets) in hindcast figures instead of the usual multi-mode figures.</td>
 </tr>
 <tr>
 <td align="left">years</td>
@@ -230,9 +238,9 @@
 </h2>
 <table class="table">
 <colgroup>
-<col width="9%">
+<col width="13%">
 <col width="5%">
-<col width="79%">
+<col width="76%">
 <col width="4%">
 </colgroup>
 <thead><tr>
@@ -273,6 +281,12 @@
 <td align="left">NA</td>
 </tr>
 <tr>
+<td align="left">fireSense_IgAndEscapeProbRas</td>
+<td align="left">SpatRaster</td>
+<td align="left">Optional; hindcast (single mode). This year’s layers <code>ignitionProb</code> and <code>escapeProb</code> from <code>fireSense_ignitionPredict</code>, written for every rep.</td>
+<td align="left">NA</td>
+</tr>
+<tr>
 <td align="left">rasterToMatchELF</td>
 <td align="left">SpatRaster</td>
 <td align="left">Optional; hindcast (single mode). The ELF core; the simulation and the observations are clipped to it.</td>
@@ -288,6 +302,12 @@
 <td align="left">outputsDF</td>
 <td align="left">data.table</td>
 <td align="left">Optional; multi mode. <code>outputs(sim)</code> of all replicates, row-bound. Its <code>file</code> column locates the burn maps and summaries. If missing, <code>simOutputPath</code> is searched.</td>
+<td align="left">NA</td>
+</tr>
+<tr>
+<td align="left">.ELFind</td>
+<td align="left">character</td>
+<td align="left">Optional; single mode. The ELF of this run, recorded in its metrics row.</td>
 <td align="left">NA</td>
 </tr>
 <tr>
