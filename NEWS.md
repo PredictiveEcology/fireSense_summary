@@ -2,7 +2,7 @@
 
 * A run over several ELFs (`.ELFind` of a `studyAreaLarge` names them all) writes one metrics row; it wrote one row per ELF, each with the run's whole metrics. The row's `ELF` is the run's `.studyAreaName`, or, when that is not set, all its ELFs (`"6.6.1, 6.6.2"`).
 
-- `SIZE_HA` is the one fire-size column. The block that copied `ADJ_HA` or `POLY_HA` into `SIZE_HA` before `plotHistoricFires()` is gone: `fireSenseUtils::plotHistoricFires()` now reads `SIZE_HA` alone. The NFDB polygons the module downloads itself already carry `SIZE_HA`; supplied `firePolys` must too (as `fireregimetools` and `fireSenseUtils::getFirePolygons()` give). Needs `fireSenseUtils` >= 0.2.3.9143.
+- `SIZE_HA` is the one fire-size column. The block that copied `ADJ_HA` or `POLY_HA` into `SIZE_HA` before `plotHistoricFires()` is gone: `fireSenseUtils::plotHistoricFires()` now reads `SIZE_HA` alone. The NFDB polygons the module downloads itself already carry `SIZE_HA`; supplied `firePolys` must too (as `fireregimetools` and `fireSenseUtils::getFirePolygons()` give). Needs `fireSenseUtils` >= 0.2.3.9145.
 
 - New parameter `fireCauses` (default `fireSenseUtils::fireSenseFireCauses`, `c("natural", "unknown")`, as in `fireSense_dataPrepFit`), passed to `fireSenseUtils::hindcastObserved()`, so the observed ignitions, escapes and area burned have the causes the model was fitted to. `init` checks it against the other modules with `SpaDES.core::paramCheckOtherMods()` and errors if they differ; `NULL` is no longer the default. Needs fireSenseUtils with `fireCauseCodes()` (Depends-on: PredictiveEcology/fireSenseUtils#193).
 
