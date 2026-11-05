@@ -16,7 +16,7 @@ defineModule(sim, list(
   documentation = list("README.md", "fireSense_summary.Rmd"), ## same file
   loadOrder = list(after = c("fireSense_burn")),
   reqdPkgs = list(
-    "assertthat", "cowplot", "data.table", "fs", "ggplot2", "googledrive",
+    "assertthat", "cowplot", "data.table", "fs", "ggplot2", "googledrive", "httr2",
     "FOR-CAST/fireregimetools@main (>= 0.1.0.9001)", ## fetch_nfdb_points()
     "purrr", "qs2", "RColorBrewer", "reproducible", "terra", "tidyterra",
     "raster", "rasterVis", ## TODO: remove these once fireSenseUtils::plotCumulativeBurns switched to ggplot2/tidyterra
