@@ -13,7 +13,7 @@ test_that("the NFDB polygons are fetched with prepInputs()", {
                                    "NFDB_poly_update_log.txt"))
     },
     .package = "reproducible")
-  shp <- nfdbShapefiles(dst)
+  shp <- moduleFun("nfdbShapefiles")(dst)
   expect_equal(basename(shp), c("NFDB_poly_1972to2020_20250630.shp", "NFDB_poly_2021to2024_20250630.shp"))
   expect_match(seen$url, "NFDB_poly[.]zip$")
   expect_equal(seen$destinationPath, dst)

@@ -1,5 +1,13 @@
 # fireSense_summary (development version)
 
+- `mode = "ELFmap"` with `nrvComparisonPath` reads each ELF's count from NRV_summary's `nrvInside.csv` (columns `poly`, `nTests`, `nInside`, `pctInside`) instead of recomputing it from `lm_nrvComparison.csv` and `st_nrvComparison.csv`, so the lead-nowhere rule lives in NRV_summary only. An ELF without the file is warned about and left out. Depends-on: PredictiveEcology/NRV_summary (nrvInside.csv PR).
+
+- Multi mode no longer makes the cumulative burn map (`plotCumulativeBurns()`) or the per-year burn figure (`plotBurnSummary()`); `burnSummaries` makes both. `raster` and `rasterVis` are no longer in `reqdPkgs`.
+
+- Multi mode's `simulated_*` figures compare with the observed fires of the study area only: undated fires (`YEAR` -9999) and fires outside `rasterToMatch` are dropped, for the NFDB polygons and the points, and an escape is a fire above `escapeSizeHa` (50 ha, as in the hindcast), not above one pixel.
+
+- The test helper `runInitMulti()` calls `SpaDES.core::start()`: in the package rendition `start` was `stats::start`, which gave a two-row `current` and failed 12 `InitMulti` tests.
+
 - New mode `"ELFmap"` with parameter `reportedELFs`: draws only the map of Canada's ELFs, the reported ones filled green (`fireSenseUtils::plotELFs()` through `Plots()`), from the `ELFs` input. For a multi-ELF report, e.g. the NRV page, redrawn as ELFs are added.
 
 - Mode `"ELFmap"` with the new parameter `nrvComparisonPath` (a folder with one subfolder per ELF holding NRV_summary's `lm_nrvComparison.csv` and `st_nrvComparison.csv`) colours each reported ELF red to green by the percentage of its NRV tests inside the natural range (`nrvInsideTable()`; `lead_` tree types with `current` and `hi` both 0 are not tests, as on the NRV page) and writes the table as `ELFmap_insideNRV.csv`. An ELF missing either table is warned about and not filled. `NA` (default): green as before. Needs fireSenseUtils with the `metricCol`, `metricRange` and `metricTitle` arguments of `plotELFs()` (Depends-on: PredictiveEcology/fireSenseUtils, plotELFs metricCol PR).

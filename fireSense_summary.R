@@ -19,7 +19,6 @@ defineModule(sim, list(
     "assertthat", "cowplot", "data.table", "fs", "ggplot2", "googledrive", "httr2",
     "FOR-CAST/fireregimetools@main (>= 0.1.0.9001)", ## fetch_nfdb_points()
     "purrr", "qs2", "RColorBrewer", "reproducible", "terra", "tidyterra",
-    "raster", "rasterVis", ## TODO: remove these once fireSenseUtils::plotCumulativeBurns switched to ggplot2/tidyterra
     "PredictiveEcology/fireSenseUtils@development (>= 0.2.3.9145)", ## plotELFs(metrics, metric, metricCol, metricRange, metricTitle) (9144); plotHistoricFires(sizeCol = "SIZE_HA"); fireSenseFireCauses; fireCauseCodes() via hindcastObserved(fireCauses); hindcast*(); hindcastObserved()$points, flammableRTM; ELFmetricsFilename(); escapes from burned-area polygons (#187)
     "PredictiveEcology/SpaDES.core@development (>= 3.2.1.9038)", ## dirnamesFromSet(leafOnly = FALSE) returns the rep folder, resolveSimYears(), padYears()
     "PredictiveEcology/SpaDES.tools@development (>= 2.1.1.9000)"
@@ -39,8 +38,8 @@ defineModule(sim, list(
                           "percentage of the ELF's NRV tests inside the natural range; written to `simOutputPath` as ELFmap.")),
     defineParameter("nrvComparisonPath", "character", NA_character_, NA, NA,
                     desc = paste("(mode = 'ELFmap') folder with one subfolder per reported ELF, each holding below it NRV_summary's",
-                                 "`lm_nrvComparison.csv` and `st_nrvComparison.csv`. The ELFs are coloured by the percentage of those",
-                                 "tests inside the NRV (red none, green all) and the table is written to `simOutputPath` as",
+                                 "`nrvInside.csv`. The ELFs are coloured by the percentage of their tests",
+                                 "inside the NRV (red none, green all) and the table is written to `simOutputPath` as",
                                  "`ELFmap_insideNRV.csv`. `NA`: the ELFs are filled green.")),
     defineParameter("reportedELFs", "character", NA_character_, NA, NA,
                     desc = "(mode = 'ELFmap') the ELFs filled (and labelled) on the map, e.g. c(\"6.4\", \"9.3\")."),
@@ -131,8 +130,8 @@ defineModule(sim, list(
 #'
 #' `init`: in single mode, schedules `save_single` at `end(sim)` (and, if `hindcastYear` is set,
 #' `hindcastRecord` every `hindcastInterval` and `hindcast` at `end(sim)`); in multi mode,
-#' runs `InitMulti()` and makes the burn summary, cumulative burn and historic
-#' fire figures. `save_single` writes `burnMap` (`.tif`) and `burnSummary` (`.csv`)
+#' runs `InitMulti()` and makes the simulated vs observed ignition, escape and area burned
+#' figures (the burn map and the burn figures are `burnSummaries`'). `save_single` writes `burnMap` (`.tif`) and `burnSummary` (`.csv`)
 #' to `outputPath(sim)`.
 #'
 #' @param sim A `simList`.
@@ -173,35 +172,11 @@ doEvent.fireSense_summary = function(sim, eventTime, eventType) {
       } else if (P(sim)$mode == "multi") {
         sim <- InitMulti(sim)
 
-        padYear <- paddedFloatToChar(time(sim), padL = ceiling(log10(end(sim) + 1)))
-
-        f_burnSummary_plot <- fireSenseUtils::plotBurnSummary(
-          climateScenario = P(sim)$climateScenario,
-          studyAreaName = P(sim)$.studyAreaName,
-          outputDir = P(sim)$simOutputPath,
-          Nreps = max(P(sim)$reps),
-          years = P(sim)$years,
-          pixelSize = unique(terra::res(sim$rasterToMatch)),
-          simFiles = mod$simFiles
-        )
-        sim <- registerOutputs(f_burnSummary_plot, sim)
-
-        f_cumulBurn_plot <- fireSenseUtils::plotCumulativeBurns(
-          climateScenario = P(sim)$climateScenario,
-          studyAreaName = P(sim)$.studyAreaName,
-          outputDir = P(sim)$simOutputPath,
-          Nreps = max(P(sim)$reps),
-          years = P(sim)$years,
-          rasterToMatch = sim$rasterToMatch,
-          simFiles = mod$simFiles
-        )
-        sim <- registerOutputs(f_cumulBurn_plot, sim)
-
         f_historic_plot <- fireSenseUtils::plotHistoricFires(
           climateScenario = as.character(P(sim)$climateScenario),
           studyAreaName = P(sim)$.studyAreaName,
           outputDir = P(sim)$simOutputPath,
-          pixelSize = unique(terra::res(sim$rasterToMatch)),
+          pixelSize = escapeSizeToPixelSize(P(sim)$escapeSizeHa),
           firePolys = mod$firePolys,
           ignitionPoints = mod$ignitionFirePoints,
           simFiles = mod$simFiles
@@ -432,10 +407,9 @@ nfdbShapefiles <- function(dst) {
 
 #' Percentage of each ELF's NRV tests inside the natural range (mode = 'ELFmap')
 #'
-#' Reads `lm_nrvComparison.csv` and `st_nrvComparison.csv` (NRV_summary; columns `poly`, `metric`, `lo`, `hi`,
-#' `mid`, `current`, `position` = "inside", "above" or "below") found anywhere below `<path>/<ELF>/`. As on the
-#' NRV page, `st` rows of a `lead_` metric with `current == 0` and `hi == 0` (a tree type that leads nowhere,
-#' now or in the NRV years) are not tests. An ELF missing either table is warned about and left out.
+#' Reads the `nrvInside.csv` NRV_summary writes (columns `poly`, `nTests`, `nInside`, `pctInside`; the count
+#' of its `lm` and `st` tests, with its lead-nowhere rule applied) found anywhere below `<path>/<ELF>/`.
+#' An ELF without the file is warned about and left out.
 #'
 #' @param ELFs Character, the ELFs to read.
 #' @param path Folder with one subfolder per ELF.
@@ -443,17 +417,14 @@ nfdbShapefiles <- function(dst) {
 #' @return A `data.table` with `ELF`, `nTests`, `nInside` and `pctInside` (`100 * nInside / nTests`).
 nrvInsideTable <- function(ELFs, path) {
   one <- function(elf) {
-    find <- function(f) list.files(file.path(path, elf), f, recursive = TRUE, full.names = TRUE)
-    lm <- find("^lm_nrvComparison[.]csv$"); st <- find("^st_nrvComparison[.]csv$")
-    if (!length(lm) || !length(st)) {
-      warning("ELF ", elf, ": no lm_nrvComparison.csv and st_nrvComparison.csv below ", file.path(path, elf),
+    file <- list.files(file.path(path, elf), "^nrvInside[.]csv$", recursive = TRUE, full.names = TRUE)
+    if (!length(file)) {
+      warning("ELF ", elf, ": no nrvInside.csv below ", file.path(path, elf),
               "; it is left out of the NRV map", call. = FALSE)
       return(NULL)
     }
-    lm <- data.table::fread(lm[1]); st <- data.table::fread(st[1])
-    st <- st[!(startsWith(st$metric, "lead_") & st$current == 0 & st$hi == 0), ]
-    position <- c(lm$position, st$position)
-    data.table::data.table(ELF = elf, nTests = length(position), nInside = sum(position == "inside"))
+    inside <- data.table::fread(file[1])
+    data.table::data.table(ELF = elf, nTests = sum(inside$nTests), nInside = sum(inside$nInside))
   }
   tab <- data.table::rbindlist(lapply(ELFs, one))
   tab$pctInside <- 100 * tab$nInside / tab$nTests
@@ -489,6 +460,33 @@ reportedELFsMap <- function(sim) {
                         deviceArgs = list(width = 10, height = 7.5, units = "in", res = 100))))
   invisible(sim)
 }
+
+#' Observed fires of the study area only, with a date
+#'
+#' The National Fire Database covers Canada and marks an undated fire `YEAR = -9999`. Keeps the fires
+#' (polygons or points) that have a `YEAR` above 0 and touch the extent of `rasterToMatch`.
+#'
+#' @param x A `SpatVector` with a `YEAR` column.
+#' @param rasterToMatch The template `SpatRaster`.
+#'
+#' @return `x` without the undated fires and the fires outside `rasterToMatch`.
+observedInStudyArea <- function(x, rasterToMatch) {
+  if (!terra::same.crs(x, rasterToMatch)) x <- terra::project(x, rasterToMatch)
+  year <- as.integer(x$YEAR)
+  inside <- terra::relate(x, terra::as.polygons(terra::ext(rasterToMatch), crs = terra::crs(rasterToMatch)),
+                          "intersects")[, 1]
+  x[which(!is.na(year) & year > 0L & inside), ]
+}
+
+#' Pixel size (m) at which a fire of `escapeSizeHa` is one pixel
+#'
+#' `fireSenseUtils::plotHistoricFires()` counts an escape as a fire larger than `pixelSize^2 / 1e4` ha, on
+#' the simulated and the observed side. Giving it this size makes that threshold the module's `escapeSizeHa`.
+#'
+#' @param escapeSizeHa Fire size (ha) counted as an escape.
+#'
+#' @return Side (m) of a square of `escapeSizeHa` ha.
+escapeSizeToPixelSize <- function(escapeSizeHa) sqrt(escapeSizeHa * 1e4)
 
 #' Find the replicate output files and the historical fires (multi mode)
 #'
@@ -604,6 +602,10 @@ InitMulti <- function(sim) {
   } else {
     fireregimetools::fetch_nfdb_points(sim$rasterToMatch, dest = inputPath(sim))
   }
+
+  ## the simulations cover the study area and every year; the observed record must too
+  mod$firePolys <- observedInStudyArea(mod$firePolys, sim$rasterToMatch)
+  mod$ignitionFirePoints <- observedInStudyArea(mod$ignitionFirePoints, sim$rasterToMatch)
 
   return(invisible(sim))
 }
