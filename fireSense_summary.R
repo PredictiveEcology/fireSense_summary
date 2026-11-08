@@ -19,7 +19,7 @@ defineModule(sim, list(
     "assertthat", "cowplot", "data.table", "fs", "ggplot2", "googledrive", "httr2",
     "FOR-CAST/fireregimetools@main (>= 0.1.0.9001)", ## fetch_nfdb_points()
     "purrr", "qs2", "RColorBrewer", "reproducible", "terra", "tidyterra",
-    "PredictiveEcology/fireSenseUtils@development (>= 0.2.3.9145)", ## plotELFs(metrics, metric, metricCol, metricRange, metricTitle) (9144); plotHistoricFires(sizeCol = "SIZE_HA"); fireSenseFireCauses; fireCauseCodes() via hindcastObserved(fireCauses); hindcast*(); hindcastObserved()$points, flammableRTM; ELFmetricsFilename(); escapes from burned-area polygons (#187)
+    "PredictiveEcology/fireSenseUtils@development (>= 0.2.3.9157)", ## plotHistoricFires(escapeSizeHa) (9157); plotELFs(metrics, metric, metricCol, metricRange, metricTitle) (9144); plotHistoricFires(sizeCol = "SIZE_HA"); fireSenseFireCauses; fireCauseCodes() via hindcastObserved(fireCauses); hindcast*(); hindcastObserved()$points, flammableRTM; ELFmetricsFilename(); escapes from burned-area polygons (#187)
     "PredictiveEcology/SpaDES.core@development (>= 3.2.1.9038)", ## dirnamesFromSet(leafOnly = FALSE) returns the rep folder, resolveSimYears(), padYears()
     "PredictiveEcology/SpaDES.tools@development (>= 2.1.1.9000)"
   ),
@@ -176,7 +176,8 @@ doEvent.fireSense_summary = function(sim, eventTime, eventType) {
           climateScenario = as.character(P(sim)$climateScenario),
           studyAreaName = P(sim)$.studyAreaName,
           outputDir = P(sim)$simOutputPath,
-          pixelSize = escapeSizeToPixelSize(P(sim)$escapeSizeHa),
+          pixelSize = unique(terra::res(sim$rasterToMatch)),
+          escapeSizeHa = P(sim)$escapeSizeHa,
           firePolys = mod$firePolys,
           ignitionPoints = mod$ignitionFirePoints,
           simFiles = mod$simFiles
@@ -477,16 +478,6 @@ observedInStudyArea <- function(x, rasterToMatch) {
                           "intersects")[, 1]
   x[which(!is.na(year) & year > 0L & inside), ]
 }
-
-#' Pixel size (m) at which a fire of `escapeSizeHa` is one pixel
-#'
-#' `fireSenseUtils::plotHistoricFires()` counts an escape as a fire larger than `pixelSize^2 / 1e4` ha, on
-#' the simulated and the observed side. Giving it this size makes that threshold the module's `escapeSizeHa`.
-#'
-#' @param escapeSizeHa Fire size (ha) counted as an escape.
-#'
-#' @return Side (m) of a square of `escapeSizeHa` ha.
-escapeSizeToPixelSize <- function(escapeSizeHa) sqrt(escapeSizeHa * 1e4)
 
 #' Find the replicate output files and the historical fires (multi mode)
 #'

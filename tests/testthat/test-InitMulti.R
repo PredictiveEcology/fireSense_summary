@@ -227,8 +227,8 @@ test_that("multi mode draws no burn map or per-year burn figure, and counts esca
   s <- SpaDES.core::spades(s)
   expect_null(called$burnSummary)
   expect_null(called$cumul)
-  ## the template has 100 m pixels (1 ha); an escape is escapeSizeHa (50 ha), so the threshold in ha is 50
-  pixelSize <- called$historic$pixelSize
-  expect_equal(pixelSize^2 / 1e4, 50)
+  ## the template has 100 m pixels (1 ha); an escape is still escapeSizeHa (50 ha)
+  expect_equal(called$historic$escapeSizeHa, 50)
+  expect_equal(called$historic$pixelSize, 100)
 })
 

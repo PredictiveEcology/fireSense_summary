@@ -4,7 +4,7 @@
 
 - Multi mode no longer makes the cumulative burn map (`plotCumulativeBurns()`) or the per-year burn figure (`plotBurnSummary()`); `burnSummaries` makes both. `raster` and `rasterVis` are no longer in `reqdPkgs`.
 
-- Multi mode's `simulated_*` figures compare with the observed fires of the study area only: undated fires (`YEAR` -9999) and fires outside `rasterToMatch` are dropped, for the NFDB polygons and the points, and an escape is a fire above `escapeSizeHa` (50 ha, as in the hindcast), not above one pixel.
+- Multi mode's `simulated_*` figures compare with the observed fires of the study area only: undated fires (`YEAR` -9999) and fires outside `rasterToMatch` are dropped, for the NFDB polygons and the points, and an escape is a fire above `escapeSizeHa` (50 ha, as in the hindcast), not above one pixel (`plotHistoricFires(escapeSizeHa = )`; needs fireSenseUtils >= 0.2.3.9157, Depends-on: PredictiveEcology/fireSenseUtils#220).
 
 - The test helper `runInitMulti()` calls `SpaDES.core::start()`: in the package rendition `start` was `stats::start`, which gave a two-row `current` and failed 12 `InitMulti` tests.
 
