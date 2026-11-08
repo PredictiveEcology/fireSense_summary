@@ -107,3 +107,8 @@ test_that(".inputObjects returns the simList unchanged", {
   expect_s4_class(s2, "simList")
   expect_identical(sort(ls(s2@.xData, all.names = TRUE)), before)
 })
+
+test_that("no figure of the module needs raster or rasterVis (burnSummaries makes the burn map)", {
+  reqd <- unlist(SpaDES.core::moduleMetadata(module = moduleName, path = modulePath)$reqdPkgs)
+  expect_false(any(c("raster", "rasterVis") %in% reqd))
+})

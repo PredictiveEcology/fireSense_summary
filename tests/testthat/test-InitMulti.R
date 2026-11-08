@@ -4,6 +4,7 @@
 ## network -- but everything before those calls is pure bookkeeping over its inputs
 ## and is tested here on toy objects.
 
+## A multi-mode simList over the toy template, with supplied observed fires and (by default) outputsDF.
 makeMultiSim <- function(firePolys = toyFirePolys(), outputsDF = NULL, reps = 1L,
                          years = c(NA_integer_, NA_integer_),
                          times = list(start = 2011, end = 2013),
@@ -39,6 +40,7 @@ makeMultiSim <- function(firePolys = toyFirePolys(), outputsDF = NULL, reps = 1L
                  cachePath = file.path(out, "cache"), inputPath = file.path(out, "in"))
   )
 }
+
 
 test_that("with outputsDF, simFiles are the matching rep files and nothing else", {
   s <- runInitMulti(makeMultiSim(reps = 1L))
@@ -182,3 +184,51 @@ test_that("without ignitionFirePoints they come from fireregimetools, not a hard
   expect_s4_class(modOf(s)$ignitionFirePoints, "SpatVector")
   expect_equal(modOf(s)$ignitionFirePoints$YEAR, c(1990L, 1991L))
 })
+
+## The observed record is the national NFDB; it must be cut to the study area and carry dated fires only.
+toyOutsideFire <- function() {
+  p <- terra::vect("POLYGON ((5000 5000, 5100 5000, 5100 5100, 5000 5100, 5000 5000))", crs = "EPSG:3978")
+  p$YEAR <- "1992"; p$SIZE_HA <- 333
+  p
+}
+toyUndatedFire <- function() {
+  p <- terra::vect("POLYGON ((100 100, 200 100, 200 200, 100 200, 100 100))", crs = "EPSG:3978")
+  p$YEAR <- "-9999"; p$SIZE_HA <- 444
+  p
+}
+
+test_that("observed fire polygons are only the dated fires inside the study area", {
+  s <- runInitMulti(makeMultiSim(firePolys = c(toyFirePolys(), list(toyOutsideFire(), toyUndatedFire()))))
+  fp <- modOf(s)$firePolys
+  expect_equal(sort(fp$YEAR), c(1990L, 1991L))
+  expect_equal(sort(fp$SIZE_HA), c(111, 222))
+})
+
+test_that("observed ignition points are only the dated fires inside the study area", {
+  pts <- terra::vect(cbind(c(50, 250, 5050, 150), c(50, 250, 5050, 150)), crs = "EPSG:3978")
+  pts$YEAR <- c(1990L, 1991L, 1992L, -9999L)
+  s <- runInitMulti(makeMultiSim(ignitionFirePoints = pts))
+  expect_equal(sort(modOf(s)$ignitionFirePoints$YEAR), c(1990L, 1991L))
+})
+
+test_that("multi mode draws no burn map or per-year burn figure, and counts escapes at escapeSizeHa", {
+  called <- list()
+  fig <- withr::local_tempfile(fileext = ".png"); file.create(fig)
+  testthat::local_mocked_bindings(
+    plotHistoricFires = function(...) { called$historic <<- list(...); fig },
+    .package = "fireSenseUtils"
+  )
+  testthat::local_mocked_bindings(
+    plotBurnSummary = function(...) { called$burnSummary <<- TRUE; fig },
+    plotCumulativeBurns = function(...) { called$cumul <<- TRUE; fig },
+    .package = "fireSenseUtils"
+  )
+  s <- makeMultiSim(times = list(start = 2011, end = 2013))
+  s <- SpaDES.core::spades(s)
+  expect_null(called$burnSummary)
+  expect_null(called$cumul)
+  ## the template has 100 m pixels (1 ha); an escape is still escapeSizeHa (50 ha)
+  expect_equal(called$historic$escapeSizeHa, 50)
+  expect_equal(called$historic$pixelSize, 100)
+})
+

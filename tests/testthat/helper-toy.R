@@ -49,7 +49,7 @@ toyIgnitionPoints <- function() {
 ## the argument name satisfies both, and works whether or not the module has been
 ## converted to a package.
 runInitMulti <- function(sim) {
-  sim@current <- data.frame(eventTime = start(sim), moduleName = "fireSense_summary",
+  sim@current <- data.frame(eventTime = SpaDES.core::start(sim), moduleName = "fireSense_summary",
                             eventType = "init", eventPriority = 1)
   sim$.mods$fireSense_summary$InitMulti(sim)
 }
