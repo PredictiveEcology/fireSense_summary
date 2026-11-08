@@ -48,3 +48,13 @@ testPaths <- local({
   }
   paths
 })
+
+## A function of the module, as the module sees it (the module is not attached in the package rendition).
+moduleFun <- function(name) {
+  out <- withr::local_tempdir(.local_envir = parent.frame())
+  SpaDES.core::simInit(times = list(start = 0, end = 1),
+                       params = list(fireSense_summary = list(mode = "ELFmap", simOutputPath = out)),
+                       modules = "fireSense_summary",
+                       paths = list(modulePath = modulePath, outputPath = out, cachePath = file.path(out, "cache"),
+                                    inputPath = file.path(out, "in")))$.mods$fireSense_summary[[name]]
+}

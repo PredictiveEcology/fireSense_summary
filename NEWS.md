@@ -1,5 +1,13 @@
 # fireSense_summary (development version)
 
+- `mode = "ELFmap"` with `nrvComparisonPath` reads each ELF's count from NRV_summary's `nrvInside.csv` (columns `poly`, `nTests`, `nInside`, `pctInside`) instead of recomputing it from `lm_nrvComparison.csv` and `st_nrvComparison.csv`, so the lead-nowhere rule lives in NRV_summary only. An ELF without the file is warned about and left out. Depends-on: PredictiveEcology/NRV_summary (nrvInside.csv PR).
+
+- Multi mode no longer makes the cumulative burn map (`plotCumulativeBurns()`) or the per-year burn figure (`plotBurnSummary()`); `burnSummaries` makes both. `raster` and `rasterVis` are no longer in `reqdPkgs`.
+
+- Multi mode's `simulated_*` figures compare with the observed fires of the study area only: undated fires (`YEAR` -9999) and fires outside `rasterToMatch` are dropped, for the NFDB polygons and the points, and an escape is a fire above `escapeSizeHa` (50 ha, as in the hindcast), not above one pixel.
+
+- The test helper `runInitMulti()` calls `SpaDES.core::start()`: in the package rendition `start` was `stats::start`, which gave a two-row `current` and failed 12 `InitMulti` tests.
+
 - `mode = "ELFmap"` also writes the national maps of annual burn probability, `NRVburnProbability.tif` (simulated) and `NRVburnProbabilityHistoric.tif` (observed), to `simOutputPath`: cloud-optimized GeoTIFFs in EPSG:3978 made by `fireSenseUtils::mosaicELFs()` from the reported ELFs' `meanAnnualCumulBurnMap.tif` and `meanAnnualCumulBurnMapHistoric.tif` (burnSummaries), blended across the overlaps of the ELFs' buffers. New parameter `burnProbabilityMap` (default `TRUE`); `FALSE` draws only the ELF map. Needs fireSenseUtils with `mosaicELFs()`.
 
 - The metrics row records when the run's fits were written: `spreadFitWrittenAt` and `ignitionFitWrittenAt` (UTC; the oldest over the run's ELFs), from the ledger rows' `writtenAt` (`spreadFitPreRun`, and fireSense_ELFs' `ignitionFitWrittenAt`). `fireSenseUtils::readELFmetrics()` orders runs by them, since ledger file names are labels and need not carry a date.

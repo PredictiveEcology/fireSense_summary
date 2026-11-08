@@ -17,7 +17,7 @@ editor_options:
 Saves and summarizes `fireSense` burn results. It has two modes (parameter `mode`):
 
 - `"single"` (default): run inside a simulation, after `fireSense_burn`. At `end(sim)` it writes `burnMap_year<end>.tif` and `fireSense_burnSummary.csv` to `outputPath(sim)`.
-- `"multi"`: run on its own after several replicates have finished. It finds each replicate's burn map and burn summary and makes figures with `fireSenseUtils::plotBurnSummary()`, `plotCumulativeBurns()` and `plotHistoricFires()`.
+- `"multi"`: run on its own after several replicates have finished. It finds each replicate's burn map and burn summary and makes the simulated vs observed ignition, escape and area burned figures with `fireSenseUtils::plotHistoricFires()`; the burn map and the burn figures are `burnSummaries`'.
 
 # Usage
 
