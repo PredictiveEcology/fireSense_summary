@@ -103,6 +103,8 @@ test_that(".inputObjects returns the simList unchanged", {
                  cachePath = testPaths$cachePath, inputPath = testPaths$inputPath)
   )
   before <- sort(ls(s@.xData, all.names = TRUE))
+  ## as during simInit(), when .inputObjects() checks the escape definition against the other modules
+  s@current <- data.table::data.table(eventTime = 1, moduleName = moduleName, eventType = "init", eventPriority = 5)
   s2 <- s$.mods[[moduleName]]$.inputObjects(s)
   expect_s4_class(s2, "simList")
   expect_identical(sort(ls(s2@.xData, all.names = TRUE)), before)
