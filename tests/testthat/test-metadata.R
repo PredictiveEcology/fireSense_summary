@@ -22,6 +22,7 @@ test_that("inputs are the expected names and classes", {
       burnSummary        = "data.table",
       firePolys          = "list",
       fireSense_IgAndEscapeProbRas = "SpatRaster",
+      flammableRTM       = "SpatRaster",
       ignitionFirePoints = "SpatVector",
       ignitionsAndEscapes = "data.table",
       outputsDF          = "data.table",
@@ -40,7 +41,7 @@ test_that("parameters are the expected names", {
   md <- SpaDES.core::moduleMetadata(module = moduleName, path = modulePath)
   expect_identical(
     sort(md$parameters$paramName),
-    sort(c(".runName", "climateScenario", "escapeSizeHa", "hindcastInterval", "hindcastYear", "mode", "reps",
+    sort(c(".runName", "climateScenario", "escapeSizeHa", "fireCauses", "hindcastInterval", "hindcastYear", "mode", "reps",
            "simOutputPath", "studyAreaName", "years"))
   )
 })
@@ -59,7 +60,7 @@ test_that("parameter classes and defaults are as declared", {
   p <- md$parameters[order(md$parameters$paramName), ]
   expect_identical(
     stats::setNames(unlist(p$paramClass), p$paramName),
-    c(.runName = "character", climateScenario = "character", escapeSizeHa = "numeric", hindcastInterval = "numeric",
+    c(.runName = "character", climateScenario = "character", escapeSizeHa = "numeric", fireCauses = "character", hindcastInterval = "numeric",
       hindcastYear = "integer", mode = "character", reps = "integer",
       simOutputPath = "character", studyAreaName = "character", years = "integer")
   )
@@ -100,6 +101,8 @@ test_that(".inputObjects returns the simList unchanged", {
                  cachePath = testPaths$cachePath, inputPath = testPaths$inputPath)
   )
   before <- sort(ls(s@.xData, all.names = TRUE))
+  ## as during simInit(), when .inputObjects() checks the escape definition against the other modules
+  s@current <- data.table::data.table(eventTime = 1, moduleName = moduleName, eventType = "init", eventPriority = 5)
   s2 <- s$.mods[[moduleName]]$.inputObjects(s)
   expect_s4_class(s2, "simList")
   expect_identical(sort(ls(s2@.xData, all.names = TRUE)), before)
