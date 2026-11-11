@@ -513,12 +513,12 @@ InitMulti <- function(sim) {
 #' No default inputs
 #'
 #' Checks that `escapeSizeHa` and `fireCauses`, the escape definition, are the same in every module that sets them
-#' (`SpaDES.core::paramCheckOtherMods()`, error), as the fit and the prediction must agree on it.
+#' (`fireSenseUtils::escapeDefinitionOf()`, an error otherwise), as the fit and the prediction must agree on it.
 #'
 #' @param sim A `simList`.
 #'
 #' @return The `simList`, invisibly.
 .inputObjects <- function(sim) {
-  for (p in c("escapeSizeHa", "fireCauses")) paramCheckOtherMods(sim, p, ifSetButDifferent = "error")
+  fireSenseUtils::escapeDefinitionOf(sim)
   return(invisible(sim))
 }
