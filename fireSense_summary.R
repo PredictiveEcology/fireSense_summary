@@ -41,8 +41,14 @@ defineModule(sim, list(
     defineParameter("reps", "integer", 1L:10L, 1, NA,
                     desc = paste("Replicate numbers to summarize (multi mode). Files are read with `mclapply`;",
                                  "set `options(mc.cores = )` to run in parallel.")),
-    defineParameter("escapeSizeHa", "numeric", 50, 0, NA,
-                    desc = "Fire size (ha) counted as an escape in the hindcast (`nFires50`); as in the fit."),
+    defineParameter("escapeSizeHa", "numeric", fireSenseUtils::fireSenseEscapeSizeHa, 0, NA,
+                    desc = paste("Size (ha) of the whole fire polygon at which a fire counts as an escape in the hindcast",
+                                 "(`nFires50` columns); as in the fit, so it is checked against the other modules'",
+                                 "`escapeSizeHa` (`paramCheckOtherMods`, error).")),
+    defineParameter("fireCauses", "character", fireSenseUtils::fireSenseFireCauses, NA, NA,
+                    desc = paste("The fire causes the hindcast counts (observed natural-cause fires, ignitions and escapes);",
+                                 "as in the fit, so it is checked against the other modules' `fireCauses`",
+                                 "(`paramCheckOtherMods`, error).")),
     defineParameter("hindcastInterval", "numeric", 1, 0, NA,
                     desc = paste("Hindcast: time between the simulated rep-years. A job for year Y runs times",
                                  "Y, Y + interval, ...; rep = round((time - hindcastYear) / interval) + 1.",
@@ -80,7 +86,11 @@ defineModule(sim, list(
                  paste("Optional; hindcast (single mode). This year's layers `ignitionProb` and `escapeProb` from",
                        "`fireSense_ignitionPredict`, written for every rep.")),
     expectsInput("rasterToMatchELF", "SpatRaster", sourceURL = NA,
-                 "Optional; hindcast (single mode). The ELF core; the simulation and the observations are clipped to it."),
+                 paste("Optional; hindcast (single mode). The ELF core. Only fires that start in it are counted,",
+                       "each at its whole extent, core and buffer.")),
+    expectsInput("flammableRTM", "SpatRaster", sourceURL = NA,
+                 paste("Optional; hindcast (single mode). The burnable pixels of the core and the buffer (from",
+                       "`fireSense_burn`): the area an observed fire polygon could have burned in the simulation.")),
     expectsInput("rstAnnualBurnID", "SpatRaster", sourceURL = NA,
                  "Optional; hindcast (single mode). This year's fire IDs from `fireSense_burn`."),
     expectsInput("outputsDF", "data.table",
@@ -204,8 +214,8 @@ hindcastRepMaps <- c("ignitionProb", "escapeProb")
 
 #' Record one simulated rep-year (hindcast, single mode)
 #'
-#' Called each `hindcastInterval` after `fireSense_burn`. Counts this year's ignitions, escapes, area burned and
-#' fires in the ELF core (`fireSenseUtils::hindcastSimulated()`) and writes the year's fire-ID raster and the
+#' Called each `hindcastInterval` after `fireSense_burn`. Counts this year's ignitions and the fires that start in
+#' the ELF core, each at its whole extent, core and buffer (`fireSenseUtils::hindcastSimulated(coreStart = TRUE)`) and writes the year's fire-ID raster and the
 #' ignition and escape probability maps used.
 #' Times need not be whole years: `rep = round((time - hindcastYear) / hindcastInterval) + 1`.
 #'
@@ -214,13 +224,13 @@ hindcastRepMaps <- c("ignitionProb", "escapeProb")
 #' @return The `simList`, invisibly, with `mod$hindcastReps` and `mod$hindcastSizes` extended.
 hindcastRecord <- function(sim) {
   needed <- c("rasterToMatchELF", "rstAnnualBurnID", "ignitionsAndEscapes", "fireSense_IgAndEscapeProbRas",
-              "ignitionFirePoints", "firePolys")
+              "ignitionFirePoints", "firePolys", "flammableRTM")
   missing <- needed[vapply(needed, function(o) is.null(sim[[o]]), logical(1))]
   if (length(missing))
     stop("hindcastYear is set, so fireSense_summary needs: ", paste(missing, collapse = ", "))
   repNo <- as.integer(round((time(sim) - P(sim)$hindcastYear) / P(sim)$hindcastInterval)) + 1L
   one <- fireSenseUtils::hindcastSimulated(sim$rstAnnualBurnID, sim$rasterToMatchELF,
-                                           sim$ignitionsAndEscapes, P(sim)$escapeSizeHa)
+                                           sim$ignitionsAndEscapes, P(sim)$escapeSizeHa, coreStart = TRUE)
   mod$hindcastReps <- data.table::rbindlist(list(
     mod$hindcastReps, cbind(data.table::data.table(rep = repNo, year = as.integer(floor(time(sim) + 1e-9)),
                                                    time = time(sim)), one$counts)))
@@ -239,14 +249,17 @@ hindcastRecord <- function(sim) {
 #'
 #' At `end(sim)`: the per-rep rows and fire sizes recorded by `hindcastRecord()`, and the observed ignitions,
 #' escapes, area burned (natural-cause and all-cause), fire sizes and natural ignition points of `hindcastYear`
-#' in the ELF core from `fireSenseUtils::hindcastObserved()`.
+#' in the ELF core from `fireSenseUtils::hindcastObserved(coreStart = TRUE)`: fires whose start is in the core,
+#' each at its whole extent, core and buffer.
 #'
 #' @param sim A `simList`.
 #'
 #' @return The `simList`, invisibly.
 hindcastSave <- function(sim) {
   obs <- fireSenseUtils::hindcastObserved(sim$rasterToMatchELF, sim$ignitionFirePoints, sim$firePolys,
-                                          P(sim)$hindcastYear, escapeSizeHa = P(sim)$escapeSizeHa)
+                                          P(sim)$hindcastYear, escapeSizeHa = P(sim)$escapeSizeHa,
+                                          flammableRTM = sim$flammableRTM, fireCauses = P(sim)$fireCauses,
+                                          coreStart = TRUE)
   tables <- list(reps = mod$hindcastReps, sizes = mod$hindcastSizes, observed = obs$counts,
                  observedSizes = obs$sizes)
   files <- file.path(outputPath(sim), hindcastFiles[names(tables)])
@@ -499,9 +512,13 @@ InitMulti <- function(sim) {
 
 #' No default inputs
 #'
+#' Checks that `escapeSizeHa` and `fireCauses`, the escape definition, are the same in every module that sets them
+#' (`fireSenseUtils::escapeDefinitionOf()`, an error otherwise), as the fit and the prediction must agree on it.
+#'
 #' @param sim A `simList`.
 #'
 #' @return The `simList`, invisibly.
 .inputObjects <- function(sim) {
+  fireSenseUtils::escapeDefinitionOf(sim)
   return(invisible(sim))
 }
