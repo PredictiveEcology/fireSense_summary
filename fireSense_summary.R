@@ -337,7 +337,7 @@ writeRunMetrics <- function(sim, observed = NULL) {
   runName <- P(sim)$.runName
   if (is.na(runName)) runName <- basename(outputPath(sim))
   ledgers <- fitLedgerFiles(sim)
-  ## one row, named by `.studyAreaName`; without one, a run over several ELFs (a studyAreaLarge, whose `.ELFind`
+  ## one row, named by `.studyAreaName`; without one, a run over several ELFs (a studyArea_fireSense, whose `.ELFind`
   ## fireSense_ELFs makes all of them) names them all in one, which is not an ELF name (merged ELFs are joined by "_")
   ELF <- if (isTRUE(mod$studyAreaNamed)) P(sim)$.studyAreaName else
     if (is.null(sim$.ELFind)) NA_character_ else paste(sim$.ELFind, collapse = ", ")
