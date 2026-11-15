@@ -73,7 +73,7 @@
                         <h4 data-toc-skip class="author">Alex
 Chubaty</h4>
             
-            <h4 data-toc-skip class="date">11 November 2026</h4>
+            <h4 data-toc-skip class="date">15 November 2026</h4>
       
 
       <div class="hidden name"><code>fireSense_summary.Rmd</code></div>
@@ -272,8 +272,8 @@ Single mode records each rep-year and, at <code>end(sim)</code>, writes
 <code>hindcast_observedSizes.csv</code>,
 <code>hindcast_observedPolys.gpkg</code>,
 <code>hindcast_observedPoints.gpkg</code>,
-<code>hindcast_burnMap.tif</code> and, per rep,
-<code>hindcast_burnID_rep&lt;rep&gt;.tif</code>,
+<code>hindcast_burnMap.tif</code> and, per rep when <code>repMaps</code>
+is TRUE, <code>hindcast_burnID_rep&lt;rep&gt;.tif</code>,
 <code>hindcast_ignitionProb_rep&lt;rep&gt;.tif</code> and
 <code>hindcast_escapeProb_rep&lt;rep&gt;.tif</code>. Multi mode pools
 the replicate folders (parameter sets) in hindcast figures instead of
@@ -281,6 +281,21 @@ the usual multi-mode figures.</td>
 <td align="left">TRUE</td>
 </tr>
 <tr class="odd">
+<td align="left">repMaps</td>
+<td align="left">logical</td>
+<td align="left">TRUE</td>
+<td align="left">NA</td>
+<td align="left">NA</td>
+<td align="left">Hindcast (single mode): write the per-rep maps
+(<code>hindcast_burnID_rep&lt;rep&gt;.tif</code>,
+<code>hindcast_ignitionProb_rep&lt;rep&gt;.tif</code>,
+<code>hindcast_escapeProb_rep&lt;rep&gt;.tif</code>). <code>FALSE</code>
+skips them and does not need <code>fireSense_IgAndEscapeProbRas</code>
+(a replay job has no ignition module); all tables and observed files are
+unchanged.</td>
+<td align="left">TRUE</td>
+</tr>
+<tr class="even">
 <td align="left">years</td>
 <td align="left">integer</td>
 <td align="left">NA, NA</td>
