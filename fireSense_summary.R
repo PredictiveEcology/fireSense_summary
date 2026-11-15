@@ -58,7 +58,7 @@ defineModule(sim, list(
                                  "`NA` (default): no hindcast. Single mode records each rep-year and, at `end(sim)`,",
                                  "writes `hindcast_reps.csv`, `hindcast_sizes.csv`, `hindcast_observed.csv`,",
                                  "`hindcast_observedSizes.csv`, `hindcast_observedPolys.gpkg`, `hindcast_observedPoints.gpkg`,",
-                                 "`hindcast_burnMap.tif` and, per rep, `hindcast_burnID_rep<rep>.tif`,",
+                                 "`hindcast_burnMap.tif` and, per rep when `repMaps` is TRUE, `hindcast_burnID_rep<rep>.tif`,",
                                  "`hindcast_ignitionProb_rep<rep>.tif` and `hindcast_escapeProb_rep<rep>.tif`. Multi mode pools the replicate folders",
                                  "(parameter sets) in hindcast figures instead of the usual multi-mode figures.")),
     defineParameter("repMaps", "logical", TRUE, NA, NA,
@@ -220,7 +220,7 @@ hindcastRepMaps <- c("ignitionProb", "escapeProb")
 #' Record one simulated rep-year (hindcast, single mode)
 #'
 #' Called each `hindcastInterval` after `fireSense_burn`. Counts this year's ignitions and the fires that start in
-#' the ELF core, each at its whole extent, core and buffer (`fireSenseUtils::hindcastSimulated(coreStart = TRUE)`) and writes the year's fire-ID raster and the
+#' the ELF core, each at its whole extent, core and buffer (`fireSenseUtils::hindcastSimulated(coreStart = TRUE)`) and, when `repMaps` is TRUE, writes the year's fire-ID raster and the
 #' ignition and escape probability maps used.
 #' Times need not be whole years: `rep = round((time - hindcastYear) / hindcastInterval) + 1`.
 #'
