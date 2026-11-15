@@ -31,7 +31,7 @@ makeMultiSim <- function(firePolys = toyFirePolys(), outputsDF = NULL, reps = 1L
     times = times,
     params = list(fireSense_summary = list(
       mode = "multi", reps = reps, simOutputPath = simOutputPath,
-      studyAreaName = "toySA", years = years
+      .studyAreaName = "toySA", years = years
     )),
     modules = "fireSense_summary",
     objects = objs,
@@ -99,31 +99,17 @@ test_that("supplied firePolys are bound into one SpatVector with an integer YEAR
   expect_type(fp$YEAR, "integer")
 })
 
-test_that("SIZE_HA is taken from ADJ_HA when present", {
-  s <- runInitMulti(makeMultiSim(firePolys = toyFirePolys("ADJ_HA")))
-  fp <- modOf(s)$firePolys
-  expect_true("SIZE_HA" %in% names(fp))
-  expect_equal(fp$SIZE_HA, c(111, 222))
-})
-
-test_that("SIZE_HA falls back to POLY_HA, from the bound polygons", {
-  ## Regression test. This branch used to read `sim$firePolys`, which is still the
-  ## *list* of annual SpatVectors the input arrived as, so tidyterra::mutate() failed
-  ## with "no applicable method for 'mutate' applied to an object of class list".
-  ## It now reads `mod$firePolys`, matching the ADJ_HA branch above.
-  s <- runInitMulti(makeMultiSim(firePolys = toyFirePolys("POLY_HA")))
-  fp <- modOf(s)$firePolys
-  expect_s4_class(fp, "SpatVector")
-  expect_equal(fp$SIZE_HA, c(111, 222))
-  expect_equal(fp$SIZE_HA, fp$POLY_HA)
-})
-
-test_that("an existing SIZE_HA column is preserved, not recomputed", {
-  fp <- toyFirePolys("ADJ_HA")
-  fp[[1]]$SIZE_HA <- 1
-  fp[[2]]$SIZE_HA <- 2
+test_that("supplied SIZE_HA is passed through, not recomputed from ADJ_HA or POLY_HA", {
+  fp <- toyFirePolys()
+  fp[[1]]$ADJ_HA <- fp[[1]]$POLY_HA <- 1
+  fp[[2]]$ADJ_HA <- fp[[2]]$POLY_HA <- 2
   s <- runInitMulti(makeMultiSim(firePolys = fp))
-  expect_equal(modOf(s)$firePolys$SIZE_HA, c(1, 2))
+  expect_equal(modOf(s)$firePolys$SIZE_HA, c(111, 222))
+})
+
+test_that("the module adds no size column of its own to supplied polygons", {
+  s <- runInitMulti(makeMultiSim(firePolys = toyFirePolys("ADJ_HA")))
+  expect_false("SIZE_HA" %in% names(modOf(s)$firePolys))
 })
 
 test_that("supplied ignitionFirePoints are passed through untouched", {
@@ -154,16 +140,29 @@ test_that("without outputsDF the simOutputPath is globbed, and missing files sto
   expect_match(err, "rep2/fireSense_burnSummary\\.csv", fixed = FALSE)
 })
 
-## NOT TESTED, deliberately: the "files all present" success path of the glob
-## branch. It appears to be unreachable. The `_year(...)` grep on line ~183 drops
-## every path without `_year` in its name, which includes
-## `fireSense_burnSummary.csv`, yet `filesExpected` below requires exactly that
-## file per replicate -- so `filesNeeded$exists` is FALSE for it even when the file
-## is there on disk, and InitMulti() stops. Confirmed by creating the four expected
-## files on disk and calling InitMulti(): it still reports the two .csv files
-## missing. This is pre-existing on `development` (same two greps, same
-## `filesExpected`), is not touched by this PR, and is not asserted here because
-## writing a test around it would enshrine it as correct behaviour.
+test_that("without outputsDF the replicate folders keep the padding found on disk", {
+  ## SpaDES.project experiments write rep01, not rep1; the expected files must be named as on disk.
+  out <- withr::local_tempdir()
+  dir.create(file.path(out, "rep01"))
+  file.create(file.path(out, "rep01", "burnMap_year2013.tif"))
+  s <- makeMultiSim(outputsDF = data.table::data.table(), reps = 1L,
+                    years = c(2011L, 2013L), simOutputPath = out)
+  err <- tryCatch(runInitMulti(s), error = function(e) conditionMessage(e))
+  expect_match(err, "rep01/fireSense_burnSummary\\.csv")
+  expect_false(grepl("rep1/", err, fixed = TRUE))
+})
+
+test_that("without outputsDF, InitMulti() succeeds when every expected file is on disk", {
+  ## The burn summary csv has no `_year` in its name; the year filter must not drop it.
+  out <- withr::local_tempdir()
+  dir.create(file.path(out, "rep01"))
+  file.create(file.path(out, "rep01", c("burnMap_year2013.tif", "fireSense_burnSummary.csv")))
+  s <- makeMultiSim(outputsDF = data.table::data.table(), reps = 1L,
+                    years = c(2011L, 2013L), simOutputPath = out)
+  m <- modOf(runInitMulti(s))
+  expect_identical(m$allReps, "rep01")
+  expect_identical(basename(m$bmbs), c("burnMap_year2013.tif", "fireSense_burnSummary.csv"))
+})
 
 test_that("without ignitionFirePoints they come from fireregimetools, not a hard-coded URL", {
   ## The module used to download `.../fire_pnt/current_version/NFDB_point.zip`, which now returns

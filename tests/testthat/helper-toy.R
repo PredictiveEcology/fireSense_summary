@@ -26,7 +26,7 @@ toyBurnSummary <- function() {
 
 ## Two annual fire polygons carrying `areaCol` as their area column, as a *list* --
 ## which is the class the `firePolys` input is declared to have.
-toyFirePolys <- function(areaCol = "ADJ_HA") {
+toyFirePolys <- function(areaCol = "SIZE_HA") {
   p1 <- terra::vect("POLYGON ((0 0, 100 0, 100 100, 0 100, 0 0))", crs = "EPSG:3978")
   p1$YEAR <- "1990"      ## character on purpose: InitMulti() is meant to coerce it
   p1[[areaCol]] <- 111
