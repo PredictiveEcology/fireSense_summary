@@ -61,6 +61,11 @@ defineModule(sim, list(
                                  "`hindcast_burnMap.tif` and, per rep, `hindcast_burnID_rep<rep>.tif`,",
                                  "`hindcast_ignitionProb_rep<rep>.tif` and `hindcast_escapeProb_rep<rep>.tif`. Multi mode pools the replicate folders",
                                  "(parameter sets) in hindcast figures instead of the usual multi-mode figures.")),
+    defineParameter("repMaps", "logical", TRUE, NA, NA,
+                    desc = paste("Hindcast (single mode): write the per-rep maps (`hindcast_burnID_rep<rep>.tif`,",
+                                 "`hindcast_ignitionProb_rep<rep>.tif`, `hindcast_escapeProb_rep<rep>.tif`).",
+                                 "`FALSE` skips them and does not need `fireSense_IgAndEscapeProbRas` (a replay job",
+                                 "has no ignition module); all tables and observed files are unchanged.")),
     defineParameter("years", "integer", c(NA_integer_, NA_integer_), NA, NA,
                     desc = paste("Which two simulation years should be compared?",
                                  "Typically start and end years.",
@@ -223,8 +228,8 @@ hindcastRepMaps <- c("ignitionProb", "escapeProb")
 #'
 #' @return The `simList`, invisibly, with `mod$hindcastReps` and `mod$hindcastSizes` extended.
 hindcastRecord <- function(sim) {
-  needed <- c("rasterToMatchELF", "rstAnnualBurnID", "ignitionsAndEscapes", "fireSense_IgAndEscapeProbRas",
-              "ignitionFirePoints", "firePolys", "flammableRTM")
+  needed <- c("rasterToMatchELF", "rstAnnualBurnID", "ignitionsAndEscapes",
+              if (P(sim)$repMaps) "fireSense_IgAndEscapeProbRas", "ignitionFirePoints", "firePolys", "flammableRTM")
   missing <- needed[vapply(needed, function(o) is.null(sim[[o]]), logical(1))]
   if (length(missing))
     stop("hindcastYear is set, so fireSense_summary needs: ", paste(missing, collapse = ", "))
@@ -236,6 +241,7 @@ hindcastRecord <- function(sim) {
                                                    time = time(sim)), one$counts)))
   mod$hindcastSizes <- data.table::rbindlist(list(
     mod$hindcastSizes, cbind(data.table::data.table(rep = repNo)[rep(1L, NROW(one$sizes))], one$sizes)))
+  if (!P(sim)$repMaps) return(invisible(sim))
   f <- file.path(outputPath(sim), sprintf("hindcast_burnID_rep%02d.tif", repNo))
   terra::writeRaster(sim$rstAnnualBurnID, f, datatype = "INT4S", overwrite = TRUE)
   ## each rep draws its own climate, so the probability maps differ by rep
