@@ -95,6 +95,25 @@ test_that("hindcast writes each rep's ignition and escape probability maps on th
   }
 })
 
+test_that("repMaps = FALSE writes the same tables and no per-rep tifs, and needs no ignition raster", {
+  tables <- c("hindcast_reps.csv", "hindcast_sizes.csv", "hindcast_observed.csv", "hindcast_observedSizes.csv")
+  ## the sim's tempdir goes with this function's frame, so read everything before returning
+  run <- function(repMaps, drop = FALSE) {
+    s <- makeHindcastSim()
+    SpaDES.core::params(s)$fireSense_summary$repMaps <- repMaps
+    if (drop) s$fireSense_IgAndEscapeProbRas <- NULL
+    SpaDES.core::spades(s, debug = FALSE)
+    out <- SpaDES.core::outputPath(s)
+    list(files = list.files(out), tables = lapply(file.path(out, tables), data.table::fread))
+  }
+  on <- run(TRUE)
+  off <- run(FALSE, drop = TRUE)
+  expect_length(grep("_rep\\d+\\.tif$", on$files), 30)
+  expect_length(grep("_rep\\d+\\.tif$", off$files), 0)
+  expect_equal(off$tables, on$tables)
+  expect_true("hindcast_burnMap.tif" %in% off$files)
+})
+
 test_that("hindcast writes the year's observed natural ignition points in the core", {
   s <- makeHindcastSim()
   out <- SpaDES.core::outputPath(s)

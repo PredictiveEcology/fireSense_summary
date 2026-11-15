@@ -41,7 +41,7 @@ test_that("parameters are the expected names", {
   md <- SpaDES.core::moduleMetadata(module = moduleName, path = modulePath)
   expect_identical(
     sort(md$parameters$paramName),
-    sort(c(".runName", "climateScenario", "escapeSizeHa", "fireCauses", "hindcastInterval", "hindcastYear", "mode", "reps",
+    sort(c(".runName", "climateScenario", "escapeSizeHa", "fireCauses", "hindcastInterval", "hindcastYear", "mode", "repMaps", "reps",
            "simOutputPath", "studyAreaName", "years"))
   )
 })
@@ -61,7 +61,7 @@ test_that("parameter classes and defaults are as declared", {
   expect_identical(
     stats::setNames(unlist(p$paramClass), p$paramName),
     c(.runName = "character", climateScenario = "character", escapeSizeHa = "numeric", fireCauses = "character", hindcastInterval = "numeric",
-      hindcastYear = "integer", mode = "character", reps = "integer",
+      hindcastYear = "integer", mode = "character", repMaps = "logical", reps = "integer",
       simOutputPath = "character", studyAreaName = "character", years = "integer")
   )
   dflt <- stats::setNames(p$default, p$paramName)
@@ -74,6 +74,7 @@ test_that("parameter classes and defaults are as declared", {
   ## no hindcast unless asked, and whole-year steps between rep-years if it is
   expect_true(is.na(dflt$hindcastYear))
   expect_identical(dflt$hindcastInterval, 1)
+  expect_true(dflt$repMaps)
   expect_true(is.na(dflt$studyAreaName))
   expect_true(is.na(dflt$.runName))
 })
