@@ -31,7 +31,7 @@
       </button>
       <span class="navbar-brand">
         <a class="navbar-link" href="../index.html">fireSense_summary</a>
-        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">1.1.0.9005</span>
+        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">1.1.0.9006</span>
       </span>
     </div>
 
@@ -73,7 +73,7 @@
                         <h4 data-toc-skip class="author">Alex
 Chubaty</h4>
             
-            <h4 data-toc-skip class="date">15 November 2026</h4>
+            <h4 data-toc-skip class="date">16 November 2026</h4>
       
 
       <div class="hidden name"><code>fireSense_summary.Rmd</code></div>
@@ -186,8 +186,11 @@ replicates in figures.</td>
 <td align="left">NA</td>
 <td align="left">NA</td>
 <td align="left">Directory holding the replicate output directories, and
-where figures are written (multi mode).</td>
-<td align="left">TRUE</td>
+where figures are written (multi mode). Not part of the event cache key:
+in multi mode, which reads the replicate folders under it, keep
+<code>.useCache</code> off, or a changed folder would give a stale cache
+hit.</td>
+<td align="left">FALSE</td>
 </tr>
 <tr class="even">
 <td align="left">.runName</td>
