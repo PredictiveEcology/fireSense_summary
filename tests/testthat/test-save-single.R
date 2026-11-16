@@ -156,3 +156,24 @@ test_that("a hindcast's metrics row has the mean of its rep-years and the observ
   expect_equal(c(row$obs_ignitions, row$obs_areaBurnedHaAllCause, row$obs_nFires50AllCause), c(7, 400, 3))
   expect_false("burnYears" %in% names(row))
 })
+
+test_that("simOutputPath is not in the init event's cache key: a run that differs only in it is a cache hit", {
+  ## a cache built on one machine is then a hit on another, where the folder differs
+  cachePath <- withr::local_tempdir()
+  runWith <- function(simOutputPath) {
+    out <- withr::local_tempdir(.local_envir = parent.frame())
+    s <- SpaDES.core::simInit(
+      times = list(start = 2011, end = 2013),
+      params = list(fireSense_summary = list(mode = "single", simOutputPath = simOutputPath, .useCache = "init")),
+      modules = "fireSense_summary",
+      objects = list(burnMap = toyBurnMap(), burnSummary = toyBurnSummary()),
+      paths = list(modulePath = modulePath, outputPath = out, cachePath = cachePath, inputPath = file.path(out, "in")))
+    SpaDES.core::spades(s, debug = FALSE)
+  }
+  nCached <- function() length(unique(reproducible::showCache(cachePath, verbose = -2)$cacheId))
+  runWith(file.path(tempdir(), "machineA"))
+  expect_identical(nCached(), 1L)                                        # the init event, cached
+  second <- runWith(file.path(tempdir(), "machineB"))
+  expect_identical(nCached(), 1L)                                        # a hit: nothing new was cached
+  expect_identical(SpaDES.core::params(second)$fireSense_summary$simOutputPath, file.path(tempdir(), "machineB"))
+})
