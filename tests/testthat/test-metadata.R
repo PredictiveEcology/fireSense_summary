@@ -108,3 +108,10 @@ test_that(".inputObjects returns the simList unchanged", {
   expect_s4_class(s2, "simList")
   expect_identical(sort(ls(s2@.xData, all.names = TRUE)), before)
 })
+
+test_that("`simOutputPath` is not part of the module's cache keys", {
+  ## single mode never reads it; it only names the folder multi mode writes its figures to
+  p <- SpaDES.core::moduleMetadata(module = moduleName, path = modulePath)$parameters
+  expect_false(p$cacheKey[p$paramName == "simOutputPath"])
+  expect_true(all(p$cacheKey[p$paramName != "simOutputPath"]))
+})

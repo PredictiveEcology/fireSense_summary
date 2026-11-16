@@ -21,7 +21,7 @@ defineModule(sim, list(
     "purrr", "qs2", "RColorBrewer", "reproducible", "terra", "tidyterra",
     "raster", "rasterVis", ## TODO: remove these once fireSenseUtils::plotCumulativeBurns switched to ggplot2/tidyterra
     "PredictiveEcology/fireSenseUtils@development (>= 0.2.3.9158)", ## ELFmetricsFilename()
-    "PredictiveEcology/SpaDES.core@development (>= 3.2.1.9001)", ## dirnamesFromSet(), resolveSimYears(), padYears()
+    "PredictiveEcology/SpaDES.core@development (>= 3.2.1.9047)", ## dirnamesFromSet(), resolveSimYears(), padYears(); 9047: defineParameter(cacheKey = FALSE)
     "PredictiveEcology/SpaDES.tools@development (>= 2.1.1.9000)"
   ),
   parameters = rbind(
@@ -32,7 +32,10 @@ defineModule(sim, list(
                     paste("'single': run within a simulation, saving `burnMap` and `burnSummary` at `end(sim)`.",
                           "'multi': summarize the saved outputs of several replicates in figures.")),
     defineParameter("simOutputPath", "character", outputPath(sim), NA, NA,
-                    desc = "Directory holding the replicate output directories, and where figures are written (multi mode)."),
+                    desc = paste("Directory holding the replicate output directories, and where figures are written (multi mode).",
+                                 "Not part of the event cache key: in multi mode, which reads the replicate folders under it,",
+                                 "keep `.useCache` off, or a changed folder would give a stale cache hit."),
+                    cacheKey = FALSE), ## single mode never reads it; a path differs between machines
     defineParameter(".runName", "character", NA_character_, NA, NA,
                     desc = paste("Name of this run, e.g. '13.1_NRV_370_1'; names its metrics file",
                                  "(`fireSenseUtils::ELFmetricsFilename()`). `NA`: the name of `outputPath(sim)`.")),
