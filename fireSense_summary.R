@@ -32,7 +32,9 @@ defineModule(sim, list(
                     paste("'single': run within a simulation, saving `burnMap` and `burnSummary` at `end(sim)`.",
                           "'multi': summarize the saved outputs of several replicates in figures.")),
     defineParameter("simOutputPath", "character", outputPath(sim), NA, NA,
-                    desc = "Directory holding the replicate output directories, and where figures are written (multi mode).",
+                    desc = paste("Directory holding the replicate output directories, and where figures are written (multi mode).",
+                                 "Not part of the event cache key: in multi mode, which reads the replicate folders under it,",
+                                 "keep `.useCache` off, or a changed folder would give a stale cache hit."),
                     cacheKey = FALSE), ## single mode never reads it; a path differs between machines
     defineParameter(".runName", "character", NA_character_, NA, NA,
                     desc = paste("Name of this run, e.g. '13.1_NRV_370_1'; names its metrics file",
