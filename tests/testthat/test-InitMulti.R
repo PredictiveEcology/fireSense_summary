@@ -184,3 +184,28 @@ test_that("without ignitionFirePoints they come from fireregimetools, not a hard
   expect_s4_class(modOf(s)$ignitionFirePoints, "SpatVector")
   expect_equal(modOf(s)$ignitionFirePoints$YEAR, c(1990L, 1991L))
 })
+
+test_that("without firePolys the NFDB polygons are clipped to rasterToMatch and an unknown year is dropped", {
+  ## Read whole, the observed area burned and escapes of the multi-mode figures were Canada's; and
+  ## NFDB's YEAR -9999 (unknown) was plotted as a year.
+  got <- list()
+  testthat::local_mocked_bindings(
+    prepInputs = function(url, destinationPath, fun, ...)
+      file.path(destinationPath, "NFDB_poly_1972to2020_20250630.shp"),
+    .package = "reproducible")
+  testthat::local_mocked_bindings(
+    load_nfdb_polys = function(nfdb_shp, study_area, fire_years = NULL, min_size_ha = 1) {
+      got <<- list(shp = nfdb_shp, study_area = study_area, min_size_ha = min_size_ha)
+      p <- terra::vect(c("POLYGON ((0 0, 100 0, 100 100, 0 100, 0 0))",
+                         "POLYGON ((200 200, 300 200, 300 300, 200 300, 200 200))"), crs = "EPSG:3978")
+      p$YEAR <- c(1990L, -9999L); p$SIZE_HA <- c(1, 2); p$MONTH <- c("7", "8"); p$DAY <- c("1", "2")
+      p
+    },
+    .package = "fireregimetools")
+  s <- runInitMulti(makeMultiSim(firePolys = NULL))
+  expect_equal(basename(got$shp), "NFDB_poly_1972to2020_20250630.shp")
+  expect_equal(terra::ext(got$study_area), terra::ext(toyRTM()))
+  expect_equal(got$min_size_ha, 0)
+  expect_equal(modOf(s)$firePolys$YEAR, 1990L)
+  expect_type(modOf(s)$firePolys$MONTH, "integer")
+})

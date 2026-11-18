@@ -1,5 +1,7 @@
 # fireSense_summary (development version)
 
+- Multi mode: the NFDB fire polygons the module reads itself (no `firePolys` supplied) are now clipped to `rasterToMatch`, as the ignition points already were (`fireregimetools::load_nfdb_polys()`); the observed area burned and escaped fires in `plotHistoricFires()` were Canada's. Fires whose NFDB `YEAR` is -9999 (unknown) are dropped; they were plotted as a year -9999. `purrr` is no longer needed; needs fireregimetools >= 0.1.0.9002.
+
 - Multi mode without `outputsDF` (replicate folders found under `simOutputPath`) stopped with "`simFiles` is required": `InitMulti()` set `simFiles` only from `outputsDF`. It is now set from the files found either way.
 
 - New mode `"ELFmap"` with parameter `reportedELFs`: draws only the map of Canada's ELFs, the reported ones filled green (`fireSenseUtils::plotELFs()` through `Plots()`), from the `ELFs` input. For a multi-ELF report, e.g. the NRV page, redrawn as ELFs are added.

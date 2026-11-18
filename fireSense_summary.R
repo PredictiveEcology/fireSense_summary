@@ -17,8 +17,8 @@ defineModule(sim, list(
   loadOrder = list(after = c("fireSense_burn")),
   reqdPkgs = list(
     "assertthat", "cowplot", "data.table", "fs", "ggplot2", "googledrive", "httr2",
-    "FOR-CAST/fireregimetools@main (>= 0.1.0.9001)", ## fetch_nfdb_points()
-    "purrr", "qs2", "RColorBrewer", "reproducible", "terra", "tidyterra",
+    "FOR-CAST/fireregimetools@main (>= 0.1.0.9002)", ## fetch_nfdb_points(); load_nfdb_polys(fire_years = NULL)
+    "qs2", "RColorBrewer", "reproducible", "terra", "tidyterra",
     "raster", "rasterVis", ## TODO: remove these once fireSenseUtils::plotCumulativeBurns switched to ggplot2/tidyterra
     "PredictiveEcology/fireSenseUtils@development (>= 0.2.3.9158)", ## plotELFs(metrics, metric, metricCol, metricRange, metricTitle) (9144); plotHistoricFires(sizeCol = "SIZE_HA"); fireSenseFireCauses; fireCauseCodes() via hindcastObserved(fireCauses); hindcast*(); hindcastObserved()$points, flammableRTM; ELFmetricsFilename(); escapes from burned-area polygons (#187)
     "PredictiveEcology/SpaDES.core@development (>= 3.2.1.9038)", ## dirnamesFromSet(leafOnly = FALSE) returns the rep folder, resolveSimYears(), padYears()
@@ -586,25 +586,14 @@ InitMulti <- function(sim) {
         YEAR = as.integer(YEAR)
       )
   } else {
-    mod$firePolys <- {
-      nfdb_shp <- nfdbShapefiles(inputPath(sim))
-
-      purrr::map(.x = nfdb_shp, .f = function(x) {
-        p <- terra::vect(x)
-
-        ## NOTE: terra::makeValid takes so long;
-        ## just drop the tiny number of invalid geometries
-        p[terra::is.valid(p), ]
-      }) |>
-        tidyterra::bind_spat_rows() |>
-        tidyterra::mutate(
-          YEAR = as.integer(YEAR),
-          MONTH = as.integer(MONTH),
-          DAY = as.integer(DAY)
-        ) |>
-        terra::project(sim$rasterToMatch)
-    }
+    ## clipped to the template raster, as the points below are: read whole, the observed area burned
+    ## and escapes were Canada's. min_size_ha = 0 keeps every fire, as before.
+    mod$firePolys <- fireregimetools::load_nfdb_polys(nfdbShapefiles(inputPath(sim)),
+                                                      study_area = sim$rasterToMatch, min_size_ha = 0) |>
+      tidyterra::mutate(MONTH = as.integer(MONTH), DAY = as.integer(DAY))
   }
+  ## NFDB's YEAR is -9999 when the year is unknown; plotted, such fires were a year -9999
+  mod$firePolys <- mod$firePolys[!mod$firePolys$YEAR %in% -9999L, ]
 
   ## NFDB points, harmonised and clipped to the template raster by fireregimetools (the URL this
   ## module used to hard-code, .../NFDB_point.zip, returns 404 now)
