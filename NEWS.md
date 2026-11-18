@@ -1,5 +1,7 @@
 # fireSense_summary (development version)
 
+- The metrics row records when the run's fits were written: `spreadFitWrittenAt` and `ignitionFitWrittenAt` (UTC; the oldest over the run's ELFs), from the ledger rows' `writtenAt` (`spreadFitPreRun`, and fireSense_ELFs' `ignitionFitWrittenAt`). `fireSenseUtils::readELFmetrics()` orders runs by them, since ledger file names are labels and need not carry a date.
+
 - New parameter `.plots` (default `"screen"`), passed to `Plots()` for the hindcast figures (multi mode) and the ELF map (`mode = "ELFmap"`). It was used but not declared, so it was `NULL` (no plots) unless `.globals` set it. `NA` or `NULL` for none.
 
 - The metrics row's `spreadFitFile` and `ignitionFitFile` now name the ledger files the run's fits were read from. With `"latest"` they named the file a new fit would be written to (`spreadFitFilenameFor(fireYears, fitFileSuffix)`), which with the default suffix is not where `"latest"` reads from. They come from the attributes `fireSenseUtils::latestSpreadFits()` and `latestIgnitionFits()` set (`spreadFitPreRun`, `fireSense_IgnitionFittedList`, now declared inputs), for the run's ELFs, joined by ", " when they differ; `NA` when unknown.

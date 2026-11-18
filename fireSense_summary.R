@@ -340,7 +340,8 @@ hindcastSave <- function(sim) {
 #' One row, written at `end(sim)` to `fireSenseUtils::ELFmetricsFilename(.runName)` in `outputPath(sim)`, for the
 #' national map: `fireSenseUtils::readELFmetrics()` collects the runs' rows and `fireSenseUtils::plotELFs(metrics =)`
 #' maps them. The row names the run (`runName`), the ELF (`sim$.ELFind`) and the spread and ignition ledger files
-#' whose fits the run used, so the reader can drop runs made with older fits; then the metrics. A hindcast gives
+#' whose fits the run used, and when those fits were written (`fitWrittenAt()`), so the reader can drop runs made
+#' with older fits; then the metrics. A hindcast gives
 #' the mean of its rep-years (`sim_*`, from `hindcastRecord()`) and the observed year (`obs_*`); any other run its
 #' fires and area burned (`burnSummary`, buffer included) per year `fireSense_burn` burned.
 #'
@@ -356,8 +357,10 @@ writeRunMetrics <- function(sim, observed = NULL) {
   ## fireSense_ELFs makes all of them) names them all in one, which is not an ELF name (merged ELFs are joined by "_")
   ELF <- if (isTRUE(mod$studyAreaNamed)) P(sim)$.studyAreaName else
     if (is.null(sim$.ELFind)) NA_character_ else paste(sim$.ELFind, collapse = ", ")
+  written <- fitWrittenAt(sim)
   row <- data.table::data.table(runName = runName, ELF = ELF,
-                                spreadFitFile = ledgers[["spread"]], ignitionFitFile = ledgers[["ignition"]])
+                                spreadFitFile = ledgers[["spread"]], ignitionFitFile = ledgers[["ignition"]],
+                                spreadFitWrittenAt = written[["spread"]], ignitionFitWrittenAt = written[["ignition"]])
   if (is.null(observed)) {
     burn <- params(sim)$fireSense_burn
     burnYears <- if (is.null(burn)) NA_integer_ else
@@ -404,6 +407,29 @@ fitLedgerFiles <- function(sim) {
   }
   c(spread = resolve(fromOthers("spreadFitFilename"), attr(sim$spreadFitPreRun, "spreadFitFiles")),
     ignition = resolve(fromOthers("ignitionFitFilename"), attr(sim$fireSense_IgnitionFittedList, "ignitionFitFiles")))
+}
+
+#' When this run's fits were written
+#'
+#' The `writtenAt` stamp of the run's ELFs' ledger rows (`reproducible::CacheGeoWrite()`): the spread rows'
+#' (`spreadFitPreRun`), the ignition fits' (attribute `ignitionFitWrittenAt` of `fireSense_IgnitionFittedList`,
+#' from fireSense_ELFs). A run over several ELFs is as old as its oldest fit. `fireSenseUtils::readELFmetrics()`
+#' keeps each ELF's runs with the newest fits by it: the ledger file names are labels and need not be dated.
+#'
+#' @param sim A `simList`.
+#'
+#' @return A named character vector, `spread` and `ignition` (`"yyyy-mm-dd HH:MM:SS"`, UTC), `NA` where not known.
+fitWrittenAt <- function(sim) {
+  ELFinds <- as.character(sim$.ELFind)
+  oldest <- function(w) {
+    w <- w[!is.na(w)]
+    if (length(w)) format(min(as.POSIXct(w, tz = "UTC")), "%Y-%m-%d %H:%M:%S", tz = "UTC") else NA_character_
+  }
+  rows <- sim$spreadFitPreRun
+  spread <- if (NROW(rows) && "writtenAt" %in% names(rows))
+    rows$writtenAt[as.character(rows[[fireSenseUtils::polygonIDTxt]]) %in% ELFinds]
+  ign <- attr(sim$fireSense_IgnitionFittedList, "ignitionFitWrittenAt")
+  c(spread = oldest(spread), ignition = oldest(ign[names(ign) %in% ELFinds]))
 }
 
 #' Hindcast figures, pooling the replicate folders (multi mode)

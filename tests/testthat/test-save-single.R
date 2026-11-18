@@ -176,6 +176,21 @@ test_that("with \"latest\" but no record of the files read, the ledger files are
   expect_true(is.na(row$ignitionFitFile))
 })
 
+test_that("the metrics row records when the run's own ELFs' fits were written", {
+  ## readELFmetrics() keeps each ELF's runs with the newest fits by this, since ledger file names are labels
+  s <- withFitModules(makeSingleSim(.ELFind = "4.10"), ignitionFitFilename = "latest")
+  s$spreadFitPreRun <- data.frame(polygonID = c("4.10", "6.2"),
+                                  writtenAt = as.POSIXct(c("2026-10-29 10:00:00", "2026-11-05 10:00:00"), tz = "UTC"))
+  s$fireSense_IgnitionFittedList <- structure(list(`4.10` = list()), ignitionFitWrittenAt =
+    c(`4.10` = as.POSIXct("2026-11-01 08:30:00", tz = "UTC"), `6.2` = as.POSIXct("2026-11-09 08:30:00", tz = "UTC")))
+  SpaDES.core::spades(s, debug = FALSE)
+  out <- SpaDES.core::outputPath(s)
+  row <- data.table::fread(file.path(out, paste0("ELFmetrics_", basename(out), ".csv")),
+                           colClasses = list(character = c("spreadFitWrittenAt", "ignitionFitWrittenAt")))
+  expect_identical(row$spreadFitWrittenAt, "2026-10-29 10:00:00")     # 4.10's, not 6.2's
+  expect_identical(row$ignitionFitWrittenAt, "2026-11-01 08:30:00")
+})
+
 test_that("without the fit modules the ledger files are NA, and the run is named after outputPath", {
   s <- makeSingleSim()
   SpaDES.core::spades(s, debug = FALSE)
