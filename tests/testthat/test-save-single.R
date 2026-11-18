@@ -129,6 +129,10 @@ test_that("the metrics row names the run, the ELF and the fits, then fires and a
   s$burnSummary <- burnSummary   # fireSense_burn's columns, not the toy's
   SpaDES.core::P(s, module = "fireSense_summary", ".runName") <- "4.10_NRV_370_1"
   s <- withFitModules(s)
+  ## "latest": each ELF's fit is from the file latestIgnitionFits() named (fireSense_ELFs keeps it as an attribute);
+  ## the metrics row recorded instead the file a new fit would be written to. Other ELFs' files do not count.
+  s$fireSense_IgnitionFittedList <- structure(list(`4.10` = list()),
+                                              ignitionFitFiles = c(`4.10` = "ig_gpscCause_20261029.rds", `5.1` = "ig_other.rds"))
   SpaDES.core::spades(s, debug = FALSE)
 
   row <- data.table::fread(file.path(SpaDES.core::outputPath(s), "ELFmetrics_4.10_NRV_370_1.csv"),
@@ -136,7 +140,7 @@ test_that("the metrics row names the run, the ELF and the fits, then fires and a
   expect_identical(row$runName, "4.10_NRV_370_1")
   expect_identical(row$ELF, "4.10")
   expect_identical(row$spreadFitFile, "fireSenseParams_x.rds")                         # named: used as it is
-  expect_identical(row$ignitionFitFile, fireSenseUtils::ignitionFitFilenameFor(1986:2024, "_t"))  # "latest": resolved
+  expect_identical(row$ignitionFitFile, "ig_gpscCause_20261029.rds")                   # "latest": the file read
   expect_equal(row$burnYears, 3)                                                       # 2011, 2012, 2013
   expect_equal(row$firesPerYear, 4 / 3)
   expect_equal(row$areaBurnedHaPerYear, 40)
@@ -158,6 +162,18 @@ test_that("a run with a .studyAreaName is named by it in its metrics row, not by
   out <- SpaDES.core::outputPath(s)
   row <- data.table::fread(file.path(out, paste0("ELFmetrics_", basename(out), ".csv")))
   expect_identical(row$ELF, "Mixedwood Plains")
+})
+
+test_that("with \"latest\" but no record of the files read, the ledger files are NA, not a made-up name", {
+  s <- withFitModules(makeSingleSim(.ELFind = "4.10"), ignitionFitFilename = "latest")
+  s@params$fireSense_spreadFit$spreadFitFilename <- "latest"
+  s$spreadFitPreRun <- structure(data.frame(polygonID = c("4.10", "6.2")),
+                                 spreadFitFiles = c(`4.10` = "sp_a_20261029.rds", `6.2` = "sp_b_20261101.rds"))
+  SpaDES.core::spades(s, debug = FALSE)
+  out <- SpaDES.core::outputPath(s)
+  row <- data.table::fread(file.path(out, paste0("ELFmetrics_", basename(out), ".csv")))
+  expect_identical(row$spreadFitFile, "sp_a_20261029.rds")
+  expect_true(is.na(row$ignitionFitFile))
 })
 
 test_that("without the fit modules the ledger files are NA, and the run is named after outputPath", {

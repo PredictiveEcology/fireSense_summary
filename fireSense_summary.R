@@ -120,6 +120,12 @@ defineModule(sim, list(
                  desc = paste("Optional; multi mode. `outputs(sim)` of all replicates, row-bound. Its `file` column",
                               "locates the burn maps and summaries. If missing, `simOutputPath` is searched."),
                  sourceURL = NA),
+    expectsInput("spreadFitPreRun", "data.frame", sourceURL = NA,
+                 desc = paste("Optional; from `fireSense_ELFs`. Its attribute `spreadFitFiles` names the ledger file of each ELF's",
+                              "spread fit, recorded in the run's metrics row.")),
+    expectsInput("fireSense_IgnitionFittedList", "list", sourceURL = NA,
+                 desc = paste("Optional; from `fireSense_ELFs`. Its attribute `ignitionFitFiles` names the ledger file of each ELF's",
+                              "ignition fit, recorded in the run's metrics row.")),
     expectsInput(".ELFind", "character", sourceURL = NA,
                  "Optional; single mode. The ELF of this run, recorded in its metrics row."),
     expectsInput("ELFs", "list", sourceURL = NA,
@@ -370,28 +376,31 @@ writeRunMetrics <- function(sim, observed = NULL) {
 
 #' The spread and ignition ledger files whose fits this run used
 #'
-#' The fit modules' `spreadFitFilename` and `ignitionFitFilename`; `"latest"` is the file a fit over `fireYears`
-#' with `fitFileSuffix` is written to (`fireSenseUtils::spreadFitFilenameFor()`, `ignitionFitFilenameFor()`). This
-#' module has none of these parameters, so they are read from the other modules, which check that they agree.
+#' The fit modules' `spreadFitFilename` and `ignitionFitFilename`. With `"latest"`, each ELF's fit comes from the
+#' newest ledger file that has it, whatever its suffix: the files are those `fireSenseUtils::latestSpreadFits()`
+#' and `latestIgnitionFits()` named (attribute `spreadFitFiles` of `spreadFitPreRun`, `ignitionFitFiles` of
+#' `fireSense_IgnitionFittedList`), for the run's ELFs, joined by ", " when they differ. This module has none of
+#' the parameters, so they are read from the other modules, which check that they agree.
 #'
 #' @param sim A `simList`.
 #'
-#' @return A named character vector, `spread` and `ignition`; `NA` where no module has the parameter.
+#' @return A named character vector, `spread` and `ignition`; `NA` where no module has the parameter, or
+#'   where `"latest"` was read but the files are not known.
 fitLedgerFiles <- function(sim) {
   fromOthers <- function(name) {
     v <- unique(Filter(Negate(is.null), lapply(params(sim), `[[`, name)))
     if (length(v)) v[[1]]
   }
-  fireYears <- fromOthers("fireYears")
-  suffix <- fromOthers("fitFileSuffix")
-  if (is.null(suffix)) suffix <- ""
-  resolve <- function(file, filenameFor) {
+  ELFinds <- as.character(sim$.ELFind)
+  resolve <- function(file, used) {
     if (is.null(file)) return(NA_character_)
     if (!identical(file, "latest")) return(file)
-    if (is.null(fireYears)) NA_character_ else filenameFor(fireYears, suffix)
+    ## a single-ELF run reads every ELF's rows; only the run's own ELFs' files count
+    used <- used[names(used) %in% ELFinds]
+    if (length(used)) paste(sort(unique(used)), collapse = ", ") else NA_character_
   }
-  c(spread = resolve(fromOthers("spreadFitFilename"), fireSenseUtils::spreadFitFilenameFor),
-    ignition = resolve(fromOthers("ignitionFitFilename"), fireSenseUtils::ignitionFitFilenameFor))
+  c(spread = resolve(fromOthers("spreadFitFilename"), attr(sim$spreadFitPreRun, "spreadFitFiles")),
+    ignition = resolve(fromOthers("ignitionFitFilename"), attr(sim$fireSense_IgnitionFittedList, "ignitionFitFiles")))
 }
 
 #' Hindcast figures, pooling the replicate folders (multi mode)

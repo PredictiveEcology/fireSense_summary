@@ -23,6 +23,7 @@ test_that("inputs are the expected names and classes", {
       ELFs               = "list",
       firePolys          = "list",
       fireSense_IgAndEscapeProbRas = "SpatRaster",
+      fireSense_IgnitionFittedList = "list",
       fireSense_SpreadParamSet = "integer",
       flammableRTM       = "SpatRaster",
       ignitionFirePoints = "SpatVector",
@@ -30,7 +31,8 @@ test_that("inputs are the expected names and classes", {
       outputsDF          = "data.table",
       rasterToMatch      = "SpatRaster",
       rasterToMatchELF   = "SpatRaster",
-      rstAnnualBurnID    = "SpatRaster")
+      rstAnnualBurnID    = "SpatRaster",
+      spreadFitPreRun    = "data.frame")
   )
 })
 
