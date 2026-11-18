@@ -162,6 +162,8 @@ test_that("without outputsDF, InitMulti() succeeds when every expected file is o
   m <- modOf(runInitMulti(s))
   expect_identical(m$allReps, "rep01")
   expect_identical(basename(m$bmbs), c("burnMap_year2013.tif", "fireSense_burnSummary.csv"))
+  ## the plotting functions stop on a NULL `simFiles` ("`simFiles` is required"); it was set only with outputsDF
+  expect_identical(m$simFiles, m$bmbs)
 })
 
 test_that("without ignitionFirePoints they come from fireregimetools, not a hard-coded URL", {
