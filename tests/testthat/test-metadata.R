@@ -65,7 +65,7 @@ test_that("parameter classes and defaults are as declared", {
   expect_identical(
     stats::setNames(unlist(p$paramClass), p$paramName),
     c(.neverCache = "character", .runName = "character", .studyAreaName = "character", climateScenario = "character", escapeSizeHa = "numeric", fireCauses = "character", hindcastInterval = "numeric",
-      hindcastYear = "integer", mode = "character", nrvComparisonPath = "character", reportedELFs = "character", repMaps = "logical", reps = "integer",
+      hindcastYear = "integer", mode = "character", nrvComparisonPath = "character", repMaps = "logical", reportedELFs = "character", reps = "integer",
       simOutputPath = "character", years = "integer")
   )
   dflt <- stats::setNames(p$default, p$paramName)

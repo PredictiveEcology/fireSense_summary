@@ -513,7 +513,7 @@ reportedELFsMap <- function(sim) {
 #'
 #' @param sim A `simList`.
 #'
-#' @return The `simList`, invisibly, with `mod$simFiles` (`NULL` without `outputsDF`),
+#' @return The `simList`, invisibly, with `mod$simFiles` (the replicate files used),
 #'   `mod$firePolys` and `mod$ignitionFirePoints` set, and `P(sim)$years` resolved.
 InitMulti <- function(sim) {
   ## check for necessary output files -----------------------------------------------
@@ -547,9 +547,6 @@ InitMulti <- function(sim) {
       grep(paste0("(", paste0(mod$allReps, collapse = "|"), ")"), x = _, value = TRUE) |>
       grep("gri|png|txt|xml", x = _, value = TRUE, invert = TRUE)
 
-    ## the per-rep outputs are not necessarily under `simOutputPath`/repNN (e.g. runs
-    ## restored from another machine), so let the plotting functions use these paths
-    mod$simFiles <- mod$bmbs
   } else {
     inReps <- grepl(paste0("(", paste0(P(sim)$reps, collapse = "|"), ")"), filesOnDisk)
     ## the year is in the burn map names only; the burn summary csv has none
@@ -583,6 +580,10 @@ InitMulti <- function(sim) {
       )
     }
   }
+  ## the per-rep outputs are not necessarily under `simOutputPath`/repNN (e.g. runs
+  ## restored from another machine), so let the plotting functions use these paths. Without
+  ## outputsDF this was left NULL, and the plotting functions stop on a NULL `simFiles`.
+  mod$simFiles <- mod$bmbs
 
   ## get historical fire points and polys -------------------------------------------
 
