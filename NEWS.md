@@ -1,5 +1,7 @@
 # fireSense_summary (development version)
 
+- `mode = "ELFmap"` also writes the national maps of annual burn probability, `NRVburnProbability.tif` (simulated) and `NRVburnProbabilityHistoric.tif` (observed), to `simOutputPath`: cloud-optimized GeoTIFFs in EPSG:3978 made by `fireSenseUtils::mosaicELFs()` from the reported ELFs' `meanAnnualCumulBurnMap.tif` and `meanAnnualCumulBurnMapHistoric.tif` (burnSummaries), blended across the overlaps of the ELFs' buffers. New parameter `burnProbabilityMap` (default `TRUE`); `FALSE` draws only the ELF map. Needs fireSenseUtils with `mosaicELFs()`.
+
 - The metrics row records when the run's fits were written: `spreadFitWrittenAt` and `ignitionFitWrittenAt` (UTC; the oldest over the run's ELFs), from the ledger rows' `writtenAt` (`spreadFitPreRun`, and fireSense_ELFs' `ignitionFitWrittenAt`). `fireSenseUtils::readELFmetrics()` orders runs by them, since ledger file names are labels and need not carry a date.
 
 - New parameter `.plots` (default `"screen"`), passed to `Plots()` for the hindcast figures (multi mode) and the ELF map (`mode = "ELFmap"`). It was used but not declared, so it was `NULL` (no plots) unless `.globals` set it. `NA` or `NULL` for none.

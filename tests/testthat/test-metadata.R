@@ -45,7 +45,7 @@ test_that("parameters are the expected names", {
   md <- SpaDES.core::moduleMetadata(module = moduleName, path = modulePath)
   expect_identical(
     sort(md$parameters$paramName),
-    sort(c(".neverCache", ".plots", ".runName", ".studyAreaName", "climateScenario", "escapeSizeHa", "fireCauses", "hindcastInterval",
+    sort(c(".neverCache", ".plots", ".runName", ".studyAreaName", "burnProbabilityMap", "climateScenario", "escapeSizeHa", "fireCauses", "hindcastInterval",
            "hindcastYear", "mode", "nrvComparisonPath", "reportedELFs", "repMaps", "reps", "simOutputPath", "years"))
   )
 })
@@ -64,7 +64,7 @@ test_that("parameter classes and defaults are as declared", {
   p <- md$parameters[order(md$parameters$paramName), ]
   expect_identical(
     stats::setNames(unlist(p$paramClass), p$paramName),
-    c(.neverCache = "character", .plots = "character", .runName = "character", .studyAreaName = "character", climateScenario = "character", escapeSizeHa = "numeric", fireCauses = "character", hindcastInterval = "numeric",
+    c(.neverCache = "character", .plots = "character", .runName = "character", .studyAreaName = "character", burnProbabilityMap = "logical", climateScenario = "character", escapeSizeHa = "numeric", fireCauses = "character", hindcastInterval = "numeric",
       hindcastYear = "integer", mode = "character", nrvComparisonPath = "character", repMaps = "logical", reportedELFs = "character", reps = "integer",
       simOutputPath = "character", years = "integer")
   )
