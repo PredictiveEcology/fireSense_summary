@@ -20,7 +20,7 @@ defineModule(sim, list(
     "FOR-CAST/fireregimetools@main (>= 0.1.0.9002)", ## fetch_nfdb_points(); load_nfdb_polys(fire_years = NULL)
     "qs2", "RColorBrewer", "reproducible", "terra", "tidyterra",
     "raster", "rasterVis", ## TODO: remove these once fireSenseUtils::plotCumulativeBurns switched to ggplot2/tidyterra
-    "PredictiveEcology/fireSenseUtils@development (>= 0.2.3.9158)", ## plotELFs(metrics, metric, metricCol, metricRange, metricTitle) (9144); plotHistoricFires(sizeCol = "SIZE_HA"); fireSenseFireCauses; fireCauseCodes() via hindcastObserved(fireCauses); hindcast*(); hindcastObserved()$points, flammableRTM; ELFmetricsFilename(); escapes from burned-area polygons (#187)
+    "PredictiveEcology/fireSenseUtils@development (>= 0.2.3.9187)", ## mosaicELFs() (9187); plotELFs(metrics, metric, metricCol, metricRange, metricTitle) (9144); plotHistoricFires(sizeCol = "SIZE_HA"); fireSenseFireCauses; fireCauseCodes() via hindcastObserved(fireCauses); hindcast*(); hindcastObserved()$points, flammableRTM; ELFmetricsFilename(); escapes from burned-area polygons (#187)
     "PredictiveEcology/SpaDES.core@development (>= 3.2.1.9038)", ## dirnamesFromSet(leafOnly = FALSE) returns the rep folder, resolveSimYears(), padYears()
     "PredictiveEcology/SpaDES.tools@development (>= 2.1.1.9000)"
   ),
@@ -42,6 +42,12 @@ defineModule(sim, list(
                                  "`lm_nrvComparison.csv` and `st_nrvComparison.csv`. The ELFs are coloured by the percentage of those",
                                  "tests inside the NRV (red none, green all) and the table is written to `simOutputPath` as",
                                  "`ELFmap_insideNRV.csv`. `NA`: the ELFs are filled green.")),
+    defineParameter("burnProbabilityMap", "logical", TRUE, NA, NA,
+                    desc = paste("(mode = 'ELFmap') also write the national maps of annual burn probability to `simOutputPath`:",
+                                 "`NRVburnProbability.tif` (simulated) and `NRVburnProbabilityHistoric.tif` (observed), cloud-optimized",
+                                 "GeoTIFFs in EPSG:3978, from each reported ELF's `meanAnnualCumulBurnMap.tif` and",
+                                 "`meanAnnualCumulBurnMapHistoric.tif` (burnSummaries) found below `simOutputPath/<ELF>/`, blended across",
+                                 "the ELFs' overlaps (`fireSenseUtils::mosaicELFs()`). `FALSE`: only the ELF map.")),
     defineParameter("reportedELFs", "character", NA_character_, NA, NA,
                     desc = "(mode = 'ELFmap') the ELFs filled (and labelled) on the map, e.g. c(\"6.4\", \"9.3\")."),
     defineParameter("simOutputPath", "character", outputPath(sim), NA, NA,
@@ -476,6 +482,9 @@ nfdbShapefiles <- function(dst) {
   grep("NFDB_poly_(1972to2020|2021to2024).*[.]shp$", files, value = TRUE)
 }
 
+## The files matching `pattern` anywhere below `<path>/<ELF>/`
+filesBelow <- function(path, ELF, pattern) list.files(file.path(path, ELF), pattern, recursive = TRUE, full.names = TRUE)
+
 #' Percentage of each ELF's NRV tests inside the natural range (mode = 'ELFmap')
 #'
 #' Reads `lm_nrvComparison.csv` and `st_nrvComparison.csv` (NRV_summary; columns `poly`, `metric`, `lo`, `hi`,
@@ -489,8 +498,7 @@ nfdbShapefiles <- function(dst) {
 #' @return A `data.table` with `ELF`, `nTests`, `nInside` and `pctInside` (`100 * nInside / nTests`).
 nrvInsideTable <- function(ELFs, path) {
   one <- function(elf) {
-    find <- function(f) list.files(file.path(path, elf), f, recursive = TRUE, full.names = TRUE)
-    lm <- find("^lm_nrvComparison[.]csv$"); st <- find("^st_nrvComparison[.]csv$")
+    lm <- filesBelow(path, elf, "^lm_nrvComparison[.]csv$"); st <- filesBelow(path, elf, "^st_nrvComparison[.]csv$")
     if (!length(lm) || !length(st)) {
       warning("ELF ", elf, ": no lm_nrvComparison.csv and st_nrvComparison.csv below ", file.path(path, elf),
               "; it is left out of the NRV map", call. = FALSE)
@@ -533,7 +541,36 @@ reportedELFsMap <- function(sim) {
                         labels = "code", labelWhich = "highlighted", buffers = FALSE, axes = "none",
                         filename = "ELFmap", path = P(sim)$simOutputPath, types = P(sim)$.plots,
                         deviceArgs = list(width = 10, height = 7.5, units = "in", res = 100))))
+  if (isTRUE(P(sim)$burnProbabilityMap)) burnProbabilityMaps(sim)
   invisible(sim)
+}
+
+#' National maps of annual burn probability from the reported ELFs (mode = 'ELFmap')
+#'
+#' `fireSenseUtils::mosaicELFs()` over the `meanAnnualCumulBurnMap.tif` (simulated) and
+#' `meanAnnualCumulBurnMapHistoric.tif` (observed) that burnSummaries left below `simOutputPath/<ELF>/` for
+#' each of `reportedELFs`: `NRVburnProbability.tif` and `NRVburnProbabilityHistoric.tif` in `simOutputPath`. An ELF
+#' with neither file is warned about and left out; with no file at all nothing is written.
+#'
+#' @param sim A `simList`.
+#'
+#' @return The two file names, invisibly.
+burnProbabilityMaps <- function(sim) {
+  stems <- c(NRVburnProbability = "meanAnnualCumulBurnMap", NRVburnProbabilityHistoric = "meanAnnualCumulBurnMapHistoric")
+  files <- lapply(stems, function(stem) {
+    f <- vapply(P(sim)$reportedELFs, function(elf)
+      c(filesBelow(P(sim)$simOutputPath, elf, paste0("^", stem, "[.]tif$")), NA_character_)[1], character(1))
+    f[!is.na(f)]
+  })
+  none <- setdiff(P(sim)$reportedELFs, unlist(lapply(files, names)))
+  if (length(none))
+    warning("ELF ", paste(none, collapse = ", "), ": no mean annual burn map below ", P(sim)$simOutputPath,
+            "; it is left out of the burn probability maps", call. = FALSE)
+  files <- files[lengths(files) > 0]
+  if (!length(files)) return(invisible(character()))
+  filename <- file.path(P(sim)$simOutputPath, paste0(names(files), ".tif"))
+  names(filename) <- names(files)
+  invisible(fireSenseUtils::mosaicELFs(files, sim$ELFs, filename))
 }
 
 #' Find the replicate output files and the historical fires (multi mode)
