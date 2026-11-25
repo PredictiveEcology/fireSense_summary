@@ -39,7 +39,8 @@ defineModule(sim, list(
     defineParameter("nrvComparisonPath", "character", NA_character_, NA, NA,
                     desc = paste("(mode = 'ELFmap') folder with one subfolder per reported ELF, each holding below it NRV_summary's",
                                  "`nrvInside.csv`. The ELFs are coloured by the percentage of their tests",
-                                 "inside the NRV (red none, green all) and the table is written to `simOutputPath` as",
+                                 "inside the NRV (red none, green all): `ELFmap` over all tests, `ELFmap_stand` over the",
+                                 "stand-level tests only. The table is written to `simOutputPath` as",
                                  "`ELFmap_insideNRV.csv`. `NA`: the ELFs are filled green.")),
     defineParameter("burnProbabilityMap", "logical", TRUE, NA, NA,
                     desc = paste("(mode = 'ELFmap') also write the national maps of annual burn probability to `simOutputPath`:",
@@ -463,14 +464,16 @@ filesBelow <- function(path, ELF, pattern) list.files(file.path(path, ELF), patt
 
 #' Percentage of each ELF's NRV tests inside the natural range (mode = 'ELFmap')
 #'
-#' Reads the `nrvInside.csv` NRV_summary writes (columns `poly`, `nTests`, `nInside`, `pctInside`; the count
-#' of its `lm` and `st` tests, with its lead-nowhere rule applied) found anywhere below `<path>/<ELF>/`.
-#' An ELF without the file is warned about and left out.
+#' Reads the `nrvInside.csv` NRV_summary writes (columns `poly`, `group`, `nTests`, `nInside`, `pctInside`; one row
+#' per analysis group, `landscape` and `stand`, with its lead-nowhere rule applied) found anywhere below
+#' `<path>/<ELF>/`. The count of all groups is summed; the stand-level tests alone give `pctInsideStand` (`NA` for a
+#' file without a `stand` group). An ELF without the file is warned about and left out.
 #'
 #' @param ELFs Character, the ELFs to read.
 #' @param path Folder with one subfolder per ELF.
 #'
-#' @return A `data.table` with `ELF`, `nTests`, `nInside` and `pctInside` (`100 * nInside / nTests`).
+#' @return A `data.table` with `ELF`, `nTests`, `nInside`, `pctInside` (`100 * nInside / nTests`, all groups) and
+#'   `pctInsideStand` (the same over the `stand` group's tests).
 nrvInsideTable <- function(ELFs, path) {
   one <- function(elf) {
     file <- filesBelow(path, elf, "^nrvInside[.]csv$")
@@ -480,10 +483,13 @@ nrvInsideTable <- function(ELFs, path) {
       return(NULL)
     }
     inside <- data.table::fread(file[1])
-    data.table::data.table(ELF = elf, nTests = sum(inside$nTests), nInside = sum(inside$nInside))
+    stand <- inside[inside$group %in% "stand", ]
+    data.table::data.table(ELF = elf, nTests = sum(inside$nTests), nInside = sum(inside$nInside),
+                           pctInsideStand = 100 * sum(stand$nInside) / sum(stand$nTests))
   }
   tab <- data.table::rbindlist(lapply(ELFs, one))
   tab$pctInside <- 100 * tab$nInside / tab$nTests
+  data.table::setcolorder(tab, c("ELF", "nTests", "nInside", "pctInside", "pctInsideStand"))
   tab
 }
 
@@ -493,27 +499,34 @@ nrvInsideTable <- function(ELFs, path) {
 #' `sim$ELFs` already has fireSense_ELFs' merges applied, so no merge plan is applied again, and no ELF
 #' is shaded as few-fire or not fitted: only the reported ones are filled, green, or, with
 #' `nrvComparisonPath`, red to green by `nrvInsideTable()` (also written to `simOutputPath` as
-#' `ELFmap_insideNRV.csv`).
+#' `ELFmap_insideNRV.csv`) over all tests (`ELFmap`) and, in a second map with the same scale, over the
+#' stand-level tests only (`ELFmap_stand`).
 #'
 #' @param sim A `simList`.
 #'
 #' @return The `simList`, invisibly.
 reportedELFsMap <- function(sim) {
   if (is.null(sim$ELFs)) stop("fireSense_summary mode = 'ELFmap' needs `ELFs` (fireSense_ELFs' output)")
-  colouring <- list(fill = "green")
-  if (!is.na(P(sim)$nrvComparisonPath)) {
+  drawMap <- function(colouring, filename) {
+    do.call(Plots, c(list(fn = fireSenseUtils::plotELFs, ELFs = sim$ELFs, which = P(sim)$reportedELFs),
+                     colouring,
+                     list(plan = data.frame(ELF = character(0), action = character(0)),
+                          fewFires = character(0), fewFiresFill = NA, arcticFill = NA,
+                          labels = "code", labelWhich = "highlighted", buffers = FALSE, axes = "none",
+                          filename = filename, path = P(sim)$simOutputPath, types = P(sim)$.plots,
+                          deviceArgs = list(width = 10, height = 7.5, units = "in", res = 100))))
+  }
+  if (is.na(P(sim)$nrvComparisonPath)) {
+    drawMap(list(fill = "green"), "ELFmap")
+  } else {
     inside <- nrvInsideTable(P(sim)$reportedELFs, P(sim)$nrvComparisonPath)
     data.table::fwrite(inside, file.path(P(sim)$simOutputPath, "ELFmap_insideNRV.csv"))
-    colouring <- list(metrics = inside, metric = "pctInside", metricCol = grDevices::hcl.colors(100, "RdYlGn"),
-                      metricRange = c(0, 100), metricTitle = "% of tests\ninside the NRV")
+    nrvColours <- function(metric, title)
+      list(metrics = inside, metric = metric, metricCol = grDevices::hcl.colors(100, "RdYlGn"),
+           metricRange = c(0, 100), metricTitle = title)
+    drawMap(nrvColours("pctInside", "% of tests\ninside the NRV"), "ELFmap")
+    drawMap(nrvColours("pctInsideStand", "% of stand tests\ninside the NRV"), "ELFmap_stand")
   }
-  do.call(Plots, c(list(fn = fireSenseUtils::plotELFs, ELFs = sim$ELFs, which = P(sim)$reportedELFs),
-                   colouring,
-                   list(plan = data.frame(ELF = character(0), action = character(0)),
-                        fewFires = character(0), fewFiresFill = NA, arcticFill = NA,
-                        labels = "code", labelWhich = "highlighted", buffers = FALSE, axes = "none",
-                        filename = "ELFmap", path = P(sim)$simOutputPath, types = P(sim)$.plots,
-                        deviceArgs = list(width = 10, height = 7.5, units = "in", res = 100))))
   if (isTRUE(P(sim)$burnProbabilityMap)) burnProbabilityMaps(sim)
   invisible(sim)
 }

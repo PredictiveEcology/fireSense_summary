@@ -1,6 +1,6 @@
 # fireSense_summary (development version)
 
-- `mode = "ELFmap"` with `nrvComparisonPath` reads each ELF's count from NRV_summary's `nrvInside.csv` (columns `poly`, `nTests`, `nInside`, `pctInside`) instead of recomputing it from `lm_nrvComparison.csv` and `st_nrvComparison.csv`, so the lead-nowhere rule lives in NRV_summary only. An ELF without the file is warned about and left out. Depends-on: PredictiveEcology/NRV_summary (nrvInside.csv PR).
+- `mode = "ELFmap"` with `nrvComparisonPath` reads each ELF's count from NRV_summary's `nrvInside.csv` (columns `poly`, `group`, `nTests`, `nInside`, `pctInside`; one row per analysis group) instead of recomputing it from `lm_nrvComparison.csv` and `st_nrvComparison.csv`, so the lead-nowhere rule lives in NRV_summary only. `ELFmap` is coloured by all groups' tests; a second map, `ELFmap_stand`, on the same 0-100 scale, by the stand-level tests only (`pctInsideStand` in `ELFmap_insideNRV.csv`). An ELF without the file is warned about and left out. Depends-on: PredictiveEcology/NRV_summary (nrvInside.csv by group PR).
 
 - Multi mode no longer makes the cumulative burn map (`plotCumulativeBurns()`) or the per-year burn figure (`plotBurnSummary()`); `burnSummaries` makes both. `raster` and `rasterVis` are no longer in `reqdPkgs`.
 
