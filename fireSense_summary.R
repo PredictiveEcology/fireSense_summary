@@ -40,7 +40,8 @@ defineModule(sim, list(
                     desc = paste("(mode = 'ELFmap') folder with one subfolder per reported ELF, each holding below it NRV_summary's",
                                  "`nrvInside.csv`. The ELFs are coloured by the percentage of their tests",
                                  "inside the NRV (red none, green all): `ELFmap` over all tests, `ELFmap_stand` over the",
-                                 "stand-level tests only. The table is written to `simOutputPath` as",
+                                 "stand-level tests only, and `ELFmap_st_<metric>` for each stand-level metric (below, inside or above the NRV range).",
+                                 "The table is written to `simOutputPath` as",
                                  "`ELFmap_insideNRV.csv`. `NA`: the ELFs are filled green.")),
     defineParameter("burnProbabilityMap", "logical", TRUE, NA, NA,
                     desc = paste("(mode = 'ELFmap') also write the national maps of annual burn probability to `simOutputPath`:",
@@ -485,12 +486,42 @@ nrvInsideTable <- function(ELFs, path) {
     inside <- data.table::fread(file[1])
     stand <- inside[inside$group %in% "stand", ]
     data.table::data.table(ELF = elf, nTests = sum(inside$nTests), nInside = sum(inside$nInside),
-                           pctInsideStand = 100 * sum(stand$nInside) / sum(stand$nTests))
+                           pctInsideStand = if (nrow(stand)) 100 * sum(stand$nInside) / sum(stand$nTests) else NA_real_)
   }
   tab <- data.table::rbindlist(lapply(ELFs, one))
   tab$pctInside <- 100 * tab$nInside / tab$nTests
   data.table::setcolorder(tab, c("ELF", "nTests", "nInside", "pctInside", "pctInsideStand"))
   tab
+}
+
+## The colours of the NRV page's positions (NRV_summary's `.positionColour`: colour-blind safe) in the order of the
+## position codes below (-1), inside (0), above (+1)
+positionColours <- c("#2166ac", "#1b9e77", "#7b3294")
+
+#' Position of each ELF's stand-level tests relative to the NRV (mode = 'ELFmap')
+#'
+#' Reads the `st_nrvComparison.csv` NRV_summary writes below `<path>/<ELF>/` (the rows of the ELF's own polygon,
+#' `poly == ELF`) and keeps the rows it marks `tested`: the lead-nowhere rule is NRV_summary's. An ELF without
+#' the file is warned about and left out.
+#'
+#' @param ELFs Character, the ELFs to read.
+#' @param path Folder with one subfolder per ELF.
+#'
+#' @return A `data.table` with `ELF`, `metric`, `label` and `code` (-1 below, 0 inside, 1 above the NRV range).
+nrvStandPositions <- function(ELFs, path) {
+  one <- function(elf) {
+    files <- filesBelow(path, elf, "^st_nrvComparison[.]csv$")
+    if (!length(files)) {
+      warning("ELF ", elf, ": no st_nrvComparison.csv below ", file.path(path, elf),
+              "; it is left out of the stand-level maps", call. = FALSE)
+      return(NULL)
+    }
+    cmp <- data.table::rbindlist(lapply(files, data.table::fread), fill = TRUE)
+    cmp <- cmp[cmp$poly %in% elf & cmp$tested %in% TRUE, ]
+    data.table::data.table(ELF = rep(elf, nrow(cmp)), metric = cmp$metric, label = cmp$label,
+                           code = c(below = -1, inside = 0, above = 1)[cmp$position])
+  }
+  data.table::rbindlist(lapply(ELFs, one))
 }
 
 #' Map of Canada's ELFs with `reportedELFs` filled (mode = 'ELFmap')
@@ -500,7 +531,9 @@ nrvInsideTable <- function(ELFs, path) {
 #' is shaded as few-fire or not fitted: only the reported ones are filled, green, or, with
 #' `nrvComparisonPath`, red to green by `nrvInsideTable()` (also written to `simOutputPath` as
 #' `ELFmap_insideNRV.csv`) over all tests (`ELFmap`) and, in a second map with the same scale, over the
-#' stand-level tests only (`ELFmap_stand`).
+#' stand-level tests only (`ELFmap_stand`), and one map per stand-level metric, `ELFmap_st_<metric>`, each ELF
+#' coloured by its position (below, inside, above the NRV range; `nrvStandPositions()`) and unfilled where the metric
+#' is not a test. `plotELFs()` takes a numeric value, so the position goes in as a code (-1, 0, 1) with three colours.
 #'
 #' @param sim A `simList`.
 #'
@@ -526,6 +559,13 @@ reportedELFsMap <- function(sim) {
            metricRange = c(0, 100), metricTitle = title)
     drawMap(nrvColours("pctInside", "% of tests\ninside the NRV"), "ELFmap")
     drawMap(nrvColours("pctInsideStand", "% of stand tests\ninside the NRV"), "ELFmap_stand")
+    positions <- nrvStandPositions(P(sim)$reportedELFs, P(sim)$nrvComparisonPath)
+    for (m in unique(positions$metric)) {
+      pm <- positions[positions$metric == m, ]
+      drawMap(list(fill = NA, metrics = pm, metric = "code", metricCol = positionColours, metricRange = c(-1, 1),
+                   metricTitle = pm$label[1]),
+              paste0("ELFmap_st_", gsub("[^A-Za-z0-9_.-]", "_", m)))
+    }
   }
   if (isTRUE(P(sim)$burnProbabilityMap)) burnProbabilityMaps(sim)
   invisible(sim)
@@ -670,8 +710,6 @@ InitMulti <- function(sim) {
                                                       study_area = sim$rasterToMatch, min_size_ha = 0) |>
       tidyterra::mutate(MONTH = as.integer(MONTH), DAY = as.integer(DAY))
   }
-  ## NFDB's YEAR is -9999 when the year is unknown; plotted, such fires were a year -9999
-  mod$firePolys <- mod$firePolys[!mod$firePolys$YEAR %in% -9999L, ]
 
   ## NFDB points, harmonised and clipped to the template raster by fireregimetools (the URL this
   ## module used to hard-code, .../NFDB_point.zip, returns 404 now)

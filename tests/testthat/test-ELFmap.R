@@ -65,7 +65,35 @@ test_that("nrvInsideTable gives no stand percentage for an ELF whose file has no
   writeNrvFixture(nrv, "6.4", nTests = 4L, nInside = 3L, stand = c(0L, 0L))
   got <- moduleFun("nrvInsideTable")("6.4", nrv)
   expect_equal(got$pctInside, 75)
-  expect_true(is.na(got$pctInsideStand))
+  expect_identical(got$pctInsideStand, NA_real_) ## NA, not NaN (0 / 0)
+})
+
+## the stand-level comparison NRV_summary writes: one row per metric, with its position and whether it is a test
+writeStFixture <- function(path, elf, metric, label = metric, position, tested = TRUE, depth = "postprocess/csv/st/ELF") {
+  d <- file.path(path, elf, depth)
+  dir.create(d, recursive = TRUE, showWarnings = FALSE)
+  utils::write.csv(data.frame(poly = elf, metric = metric, label = label, position = position, tested = tested),
+                   file.path(d, "st_nrvComparison.csv"), row.names = FALSE)
+}
+
+test_that("nrvStandPositions codes the position of each tested stand-level metric, below -1, inside 0, above 1", {
+  nrv <- withr::local_tempdir()
+  writeStFixture(nrv, "6.4", c("age_Old", "lead_A", "lead_Zero"), c("Old forest", "Pine", "Zero"),
+                 c("below", "inside", "above"), tested = c(TRUE, TRUE, FALSE))
+  writeStFixture(nrv, "9.3", "age_Old", "Old forest", "above")
+  got <- moduleFun("nrvStandPositions")(c("6.4", "9.3"), nrv)
+  expect_identical(got$ELF, c("6.4", "6.4", "9.3"))
+  expect_identical(got$metric, c("age_Old", "lead_A", "age_Old")) ## lead_Zero is not a test
+  expect_identical(got$label, c("Old forest", "Pine", "Old forest"))
+  expect_equal(got$code, c(-1, 0, 1))
+})
+
+test_that("nrvStandPositions warns about an ELF without st_nrvComparison.csv and leaves it out", {
+  nrv <- withr::local_tempdir()
+  writeStFixture(nrv, "6.4", "age_Old", position = "inside")
+  dir.create(file.path(nrv, "9.3"))
+  expect_warning(got <- moduleFun("nrvStandPositions")(c("6.4", "9.3"), nrv), "9.3")
+  expect_identical(got$ELF, "6.4")
 })
 
 test_that("nrvInsideTable warns about an ELF without nrvInside.csv and leaves it out", {
@@ -80,6 +108,7 @@ test_that("nrvInsideTable warns about an ELF without nrvInside.csv and leaves it
 test_that("ELFmap mode with nrvComparisonPath draws the all-tests map and the stand-only map, one scale", {
   out <- withr::local_tempdir(); nrv <- withr::local_tempdir()
   writeNrvFixture(nrv, "6.4", nTests = 3L, nInside = 2L, stand = c(2L, 1L))
+  writeStFixture(nrv, "6.4", c("age_Old", "lead_A"), c("Old forest", "Pine"), c("below", "above"))
   calls <- list()
   testthat::local_mocked_bindings(
     plotELFs = function(...) { calls[[length(calls) + 1L]] <<- list(...); graphics::plot(1) },
@@ -95,6 +124,8 @@ test_that("ELFmap mode with nrvComparisonPath draws the all-tests map and the st
                  inputPath = file.path(out, "in"))
   )
   ## Plots() may call the function more than once per figure; one call per metric is enough
+  st <- calls[vapply(calls, function(x) identical(x$metric, "code"), NA)]
+  calls <- calls[!vapply(calls, function(x) identical(x$metric, "code"), NA)]
   calls <- calls[!duplicated(vapply(calls, function(x) x$metric, ""))]
   expect_length(calls, 2L)
   expect_identical(vapply(calls, function(x) x$metric, ""), c("pctInside", "pctInsideStand"))
@@ -103,10 +134,17 @@ test_that("ELFmap mode with nrvComparisonPath draws the all-tests map and the st
   expect_identical(calls[[1]]$metricCol, calls[[2]]$metricCol)
   expect_equal(calls[[1]]$metricRange, c(0, 100))
   expect_equal(calls[[2]]$metricRange, c(0, 100))
+  ## one map per stand-level metric: the position as a code, three colours, the metric's label as title
+  st <- st[!duplicated(vapply(st, function(x) x$metricTitle, ""))]
+  expect_identical(vapply(st, function(x) x$metricTitle, ""), c("Old forest", "Pine"))
+  expect_equal(vapply(st, function(x) x$metrics$code, 0), c(-1, 1))
+  expect_length(st[[1]]$metricCol, 3L)
+  expect_equal(st[[1]]$metricRange, c(-1, 1))
+  expect_true(is.na(st[[1]]$fill)) ## an ELF where the metric is not a test is not filled
   expect_identical(calls[[1]]$which, "6.4")
   expect_equal(calls[[1]]$metrics$pctInside, 200 / 3)
   expect_equal(calls[[1]]$metrics$pctInsideStand, 50)
-  expect_setequal(basename(list.files(out, "\\.png$", recursive = TRUE)), c("ELFmap.png", "ELFmap_stand.png"))
+  expect_setequal(basename(list.files(out, "\\.png$", recursive = TRUE)), c("ELFmap.png", "ELFmap_stand.png", "ELFmap_st_age_Old.png", "ELFmap_st_lead_A.png"))
   tab <- data.table::fread(file.path(out, "ELFmap_insideNRV.csv"))
   expect_identical(tab$nTests, 3L)
   expect_equal(tab$pctInsideStand, 50)
