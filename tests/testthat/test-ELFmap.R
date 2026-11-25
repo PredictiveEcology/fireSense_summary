@@ -136,7 +136,8 @@ test_that("ELFmap mode with nrvComparisonPath draws the all-tests map and the st
   expect_equal(calls[[2]]$metricRange, c(0, 100))
   ## one map per stand-level metric: the position as a code, three colours, the metric's label as title
   st <- st[!duplicated(vapply(st, function(x) x$metricTitle, ""))]
-  expect_identical(vapply(st, function(x) x$metricTitle, ""), c("Old forest", "Pine"))
+  key <- "\n-1 below \u00b7 0 inside \u00b7 1 above" ## the legend has no labels of its own
+  expect_identical(vapply(st, function(x) x$metricTitle, ""), paste0(c("Old forest", "Pine"), key))
   expect_equal(vapply(st, function(x) x$metrics$code, 0), c(-1, 1))
   expect_length(st[[1]]$metricCol, 3L)
   expect_equal(st[[1]]$metricRange, c(-1, 1))

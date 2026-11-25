@@ -533,7 +533,7 @@ nrvStandPositions <- function(ELFs, path) {
 #' `ELFmap_insideNRV.csv`) over all tests (`ELFmap`) and, in a second map with the same scale, over the
 #' stand-level tests only (`ELFmap_stand`), and one map per stand-level metric, `ELFmap_st_<metric>`, each ELF
 #' coloured by its position (below, inside, above the NRV range; `nrvStandPositions()`) and unfilled where the metric
-#' is not a test. `plotELFs()` takes a numeric value, so the position goes in as a code (-1, 0, 1) with three colours.
+#' is not a test. `plotELFs()` takes a numeric value and cannot label its legend breaks, so the position goes in as a code (-1, 0, 1) with three colours, and the title says what the codes mean.
 #'
 #' @param sim A `simList`.
 #'
@@ -563,7 +563,7 @@ reportedELFsMap <- function(sim) {
     for (m in unique(positions$metric)) {
       pm <- positions[positions$metric == m, ]
       drawMap(list(fill = NA, metrics = pm, metric = "code", metricCol = positionColours, metricRange = c(-1, 1),
-                   metricTitle = pm$label[1]),
+                   metricTitle = paste0(pm$label[1], "\n-1 below \u00b7 0 inside \u00b7 1 above")),
               paste0("ELFmap_st_", gsub("[^A-Za-z0-9_.-]", "_", m)))
     }
   }
