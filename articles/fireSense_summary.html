@@ -324,6 +324,141 @@ all the work: locates the files and makes the figures.</li>
 <code>save_single</code>: writes the burn map and burn summary
 (single mode only).</li>
 </ul>
+<div class="figure">
+<img src="figures/fireSense_summary_eventFlow.png" alt="fireSense_summary events, as read from the module code with its default parameters." width="100%"><p class="caption">
+fireSense_summary events, as read from the module code with its default
+parameters.
+</p>
+</div>
+<p>The table below lists, for each object, the code that writes it and
+the code that only reads it.</p>
+<table class="table table" style="width: auto !important; border-bottom: 0;">
+<caption>
+Where each object of fireSense_summary is written and read, in run
+order.
+</caption>
+<thead><tr>
+<th style="text-align:left;">
+Object
+</th>
+<th style="text-align:left;">
+Written by
+</th>
+<th style="text-align:left;">
+Read by
+</th>
+</tr></thead>
+<tbody>
+<tr grouplength="7">
+<td colspan="3" style="border-bottom: 1px solid;">
+<strong>Inputs</strong>
+</td>
+</tr>
+<tr>
+<td style="text-align:left;padding-left: 2em;" indentlevel="1">
+outputsDF
+</td>
+<td style="text-align:left;">
+</td>
+<td style="text-align:left;">
+init: hindcastFigures(), init: InitMulti()
+</td>
+</tr>
+<tr>
+<td style="text-align:left;padding-left: 2em;" indentlevel="1">
+firePolys
+</td>
+<td style="text-align:left;">
+</td>
+<td style="text-align:left;">
+init: InitMulti()
+</td>
+</tr>
+<tr>
+<td style="text-align:left;padding-left: 2em;" indentlevel="1">
+ignitionFirePoints
+</td>
+<td style="text-align:left;">
+</td>
+<td style="text-align:left;">
+init: InitMulti()
+</td>
+</tr>
+<tr>
+<td style="text-align:left;padding-left: 2em;" indentlevel="1">
+rasterToMatch
+</td>
+<td style="text-align:left;">
+</td>
+<td style="text-align:left;">
+init: InitMulti(), init (own code)
+</td>
+</tr>
+<tr>
+<td style="text-align:left;padding-left: 2em;" indentlevel="1">
+.ELFind
+</td>
+<td style="text-align:left;">
+</td>
+<td style="text-align:left;">
+save_single (single)
+</td>
+</tr>
+<tr>
+<td style="text-align:left;padding-left: 2em;" indentlevel="1">
+burnMap
+</td>
+<td style="text-align:left;">
+</td>
+<td style="text-align:left;">
+save_single (single)
+</td>
+</tr>
+<tr>
+<td style="text-align:left;padding-left: 2em;" indentlevel="1">
+burnSummary
+</td>
+<td style="text-align:left;">
+</td>
+<td style="text-align:left;">
+save_single (single)
+</td>
+</tr>
+</tbody>
+<tfoot><tr>
+<td style="padding: 0; " colspan="100%">
+<sup></sup> Not shown, off with the default parameters: hindcastRecord,
+hindcast. Not shown, touching no object in the metadata: .inputObjects.
+Not traced to any code (e.g. reached indirectly): ignitionsAndEscapes,
+fireSense_IgAndEscapeProbRas, rasterToMatchELF, flammableRTM,
+rstAnnualBurnID.
+</td>
+</tr></tfoot>
+</table>
+<div class="section level3">
+<h3 class="unnumbered" id="hindcastfigures">hindcastFigures()<a class="anchor" aria-label="anchor" href="#hindcastfigures"></a>
+</h3>
+<p>init event, step 1 of 2</p>
+<p><img src="figures/fireSense_summary_io_init_hindcastFigures.png" style="width:100.0%"></p>
+</div>
+<div class="section level3">
+<h3 class="unnumbered" id="initmulti">InitMulti()<a class="anchor" aria-label="anchor" href="#initmulti"></a>
+</h3>
+<p>init event, step 2 of 2</p>
+<p><img src="figures/fireSense_summary_io_init_InitMulti.png" style="width:100.0%"></p>
+</div>
+<div class="section level3">
+<h3 class="unnumbered" id="init-own-code">init (own code)<a class="anchor" aria-label="anchor" href="#init-own-code"></a>
+</h3>
+<p>the init event’s own code, outside the functions it calls</p>
+<p><img src="figures/fireSense_summary_io_init_own.png" style="width:100.0%"></p>
+</div>
+<div class="section level3">
+<h3 class="unnumbered" id="save_single">save_single<a class="anchor" aria-label="anchor" href="#save_single"></a>
+</h3>
+<p>mode = “single”: once, at end</p>
+<p><img src="figures/fireSense_summary_io_save_single.png" style="width:100.0%"></p>
+</div>
 <div class="section level3">
 <h3 id="plotting">Plotting<a class="anchor" aria-label="anchor" href="#plotting"></a>
 </h3>
