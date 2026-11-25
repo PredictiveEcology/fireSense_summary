@@ -48,7 +48,8 @@ test_that("with outputsDF, simFiles are the matching rep files and nothing else"
   ## rep2 is dropped (not in `reps`), and the .png is dropped by the extension filter
   expect_identical(basename(m$simFiles),
                    c("burnMap_year2013.tif", "fireSense_burnSummary.csv"))
-  expect_identical(m$allReps, "rep1")
+  ## unname(): SpaDES.core >= 3.2.1.9077 names dirnamesFromSet() results by replicate id
+  expect_identical(unname(m$allReps), "rep1")
   ## simFiles is exactly bmbs -- the paths handed to the plotting functions
   expect_identical(m$simFiles, m$bmbs)
 })
@@ -56,7 +57,7 @@ test_that("with outputsDF, simFiles are the matching rep files and nothing else"
 test_that("reps selects which replicate directories are used", {
   s <- runInitMulti(makeMultiSim(reps = 1L:2L))
   m <- modOf(s)
-  expect_identical(m$allReps, c("rep1", "rep2"))
+  expect_identical(unname(m$allReps), c("rep1", "rep2"))
   expect_equal(length(m$simFiles), 3L) ## two rep1 files + one rep2 file
   expect_true(any(grepl("/rep2/", m$simFiles)))
 
