@@ -1,7 +1,7 @@
 ---
 title: "fireSense_summary"
 author: "Alex Chubaty"
-date: "22 November 2026"
+date: "25 November 2026"
 output:
   html_document:
     df_print: paged
@@ -46,6 +46,7 @@ spades(mySim)
 ```
 
 The replicate files are found either from `outputsDF` (the row-bound `outputs(sim)` of the replicates) or, without it, by searching `simOutputPath/rep*/`; in that case the module stops if a burn map or burn summary is missing.
+Either way, a replicate's files are only those under its own folder (`rep1` is not `rep10`), and the module stops if a replicate in `reps` has no outputs.
 Historical fires for the comparison figure come from `firePolys` and `ignitionFirePoints`, or are downloaded from the Canadian National Fire Database.
 
 # Parameters

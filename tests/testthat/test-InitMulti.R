@@ -50,7 +50,8 @@ test_that("with outputsDF, simFiles are the matching rep files and nothing else"
   ## rep2 is dropped (not in `reps`), and the .png is dropped by the extension filter
   expect_identical(basename(m$simFiles),
                    c("burnMap_year2013.tif", "fireSense_burnSummary.csv"))
-  expect_identical(m$allReps, "rep1")
+  ## named by replicate id (SpaDES.core >= 3.2.1.9077)
+  expect_identical(m$allReps, c("1" = "rep1"))
   ## simFiles is exactly bmbs -- the paths handed to the plotting functions
   expect_identical(m$simFiles, m$bmbs)
 })
@@ -58,16 +59,25 @@ test_that("with outputsDF, simFiles are the matching rep files and nothing else"
 test_that("reps selects which replicate directories are used", {
   s <- runInitMulti(makeMultiSim(reps = 1L:2L))
   m <- modOf(s)
-  expect_identical(m$allReps, c("rep1", "rep2"))
+  expect_identical(m$allReps, c("1" = "rep1", "2" = "rep2"))
   expect_equal(length(m$simFiles), 3L) ## two rep1 files + one rep2 file
   expect_true(any(grepl("/rep2/", m$simFiles)))
+})
 
-  ## NOT asserted: what happens when `reps` names a replicate that produced nothing.
-  ## SpaDES.core::dirnamesFromSet() returns the bare prefix "rep" for an empty
-  ## match, and the `(rep)` alternation InitMulti() then builds matches every rep
-  ## directory, so asking for rep3 alone yields all three rep1/rep2 files. That is
-  ## upstream behaviour in SpaDES.core, not this module, and pinning it here would
-  ## enshrine it.
+test_that("a replicate in `reps` with no outputs stops, naming it", {
+  ## With outputsDF it used to take every replicate's files: no folder names made a pattern matching any path.
+  expect_error(runInitMulti(makeMultiSim(reps = c(1L, 3L))), "no outputs in outputsDF for replicate 3")
+})
+
+test_that("a replicate's files are those under its own folder: rep1 is not rep10", {
+  out <- withr::local_tempdir()
+  outputsDF <- data.table::data.table(
+    file = file.path(out, rep(c("rep1", "rep10"), each = 2), c("burnMap_year2013.tif", "fireSense_burnSummary.csv")),
+    saveTime = 2013
+  )
+  m <- modOf(runInitMulti(makeMultiSim(outputsDF = outputsDF, reps = 1L, simOutputPath = out)))
+  expect_identical(m$allReps, c("1" = "rep1"))
+  expect_identical(m$simFiles, outputsDF$file[1:2])
 })
 
 test_that("an all-NA years parameter resolves to the simulation's own start and end", {
@@ -162,10 +172,24 @@ test_that("without outputsDF, InitMulti() succeeds when every expected file is o
   s <- makeMultiSim(outputsDF = data.table::data.table(), reps = 1L,
                     years = c(2011L, 2013L), simOutputPath = out)
   m <- modOf(runInitMulti(s))
-  expect_identical(m$allReps, "rep01")
+  expect_identical(m$allReps, c("1" = "rep01"))
   expect_identical(basename(m$bmbs), c("burnMap_year2013.tif", "fireSense_burnSummary.csv"))
   ## the plotting functions stop on a NULL `simFiles` ("`simFiles` is required"); it was set only with outputsDF
   expect_identical(m$simFiles, m$bmbs)
+})
+
+test_that("without outputsDF, a replicate's files are those under its own folder", {
+  ## the replicate number used to match any path containing it: 1 is in rep10 and in _year2013
+  out <- withr::local_tempdir()
+  for (d in c("rep01", "rep10")) {
+    dir.create(file.path(out, d))
+    file.create(file.path(out, d, c("burnMap_year2013.tif", "fireSense_burnSummary.csv")))
+  }
+  s <- makeMultiSim(outputsDF = data.table::data.table(), reps = 1L,
+                    years = c(2011L, 2013L), simOutputPath = out)
+  m <- modOf(runInitMulti(s))
+  expect_identical(m$allReps, c("1" = "rep01"))
+  expect_identical(as.character(dirname(m$bmbs)), rep(file.path(out, "rep01"), 2))
 })
 
 test_that("without ignitionFirePoints they come from fireregimetools, not a hard-coded URL", {

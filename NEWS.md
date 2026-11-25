@@ -1,5 +1,7 @@
 # fireSense_summary (development version)
 
+- Multi mode takes a replicate's files only from that replicate's folder, so `rep1` no longer picks up `rep10`'s, and without `outputsDF` a replicate's number no longer matches any path containing it (e.g. `1` in `_year2013`). A replicate in `reps` with no outputs now stops, naming it; with `outputsDF` it used to take every replicate's files. Needs SpaDES.core >= 3.2.1.9077 (`dirnamesFromSet()` named by replicate id, PredictiveEcology/SpaDES.core#543).
+
 - `mode = "ELFmap"` with `nrvComparisonPath` reads each ELF's count from NRV_summary's `nrvInside.csv` (columns `poly`, `group`, `nTests`, `nInside`, `pctInside`; one row per analysis group) instead of recomputing it from `lm_nrvComparison.csv` and `st_nrvComparison.csv`, so the lead-nowhere rule lives in NRV_summary only. `ELFmap` is coloured by all groups' tests; a second map, `ELFmap_stand`, on the same 0-100 scale, by the stand-level tests only (`pctInsideStand` in `ELFmap_insideNRV.csv`), and one map per stand-level metric, `ELFmap_st_<metric>`, each ELF coloured by whether the metric is below, inside or above its NRV range (from `st_nrvComparison.csv`, `tested` rows only; ELFs where it is not a test are unfilled). An ELF without the file is warned about and left out. Depends-on: PredictiveEcology/NRV_summary (nrvInside.csv by group PR).
 
 - Multi mode no longer makes the cumulative burn map (`plotCumulativeBurns()`) or the per-year burn figure (`plotBurnSummary()`); `burnSummaries` makes both. `raster` and `rasterVis` are no longer in `reqdPkgs`.
