@@ -19,7 +19,7 @@ defineModule(sim, list(
     "assertthat", "cowplot", "data.table", "fs", "ggplot2", "googledrive", "httr2",
     "FOR-CAST/fireregimetools@main (>= 0.1.0.9002)", ## fetch_nfdb_points(); load_nfdb_polys(fire_years = NULL)
     "qs2", "RColorBrewer", "reproducible", "terra", "tidyterra",
-    "PredictiveEcology/fireSenseUtils@development (>= 0.2.3.9187)", ## mosaicELFs() (9187); plotELFs(metrics, metric, metricCol, metricRange, metricTitle) (9144); plotHistoricFires(sizeCol = "SIZE_HA"); fireSenseFireCauses; fireCauseCodes() via hindcastObserved(fireCauses); hindcast*(); hindcastObserved()$points, flammableRTM; ELFmetricsFilename(); escapes from burned-area polygons (#187)
+    "PredictiveEcology/fireSenseUtils@development (>= 0.2.3.9193)", ## plotHistoricFires(escapeSizeHa) (9193); mosaicELFs() (9187); plotELFs(metrics, metric, metricCol, metricRange, metricTitle) (9144); plotHistoricFires(sizeCol = "SIZE_HA"); fireSenseFireCauses; fireCauseCodes() via hindcastObserved(fireCauses); hindcast*(); hindcastObserved()$points, flammableRTM; ELFmetricsFilename(); escapes from burned-area polygons (#187)
     "PredictiveEcology/SpaDES.core@development (>= 3.2.1.9077)", ## dirnamesFromSet() named by replicate id, repFiles(), resolveSimYears(), padYears()
     "PredictiveEcology/SpaDES.tools@development (>= 2.1.1.9000)"
   ),
@@ -201,7 +201,8 @@ doEvent.fireSense_summary = function(sim, eventTime, eventType) {
           pixelSize = unique(terra::res(sim$rasterToMatch)),
           firePolys = mod$firePolys,
           ignitionPoints = mod$ignitionFirePoints,
-          simFiles = mod$simFiles
+          simFiles = mod$simFiles,
+          escapeSizeHa = P(sim)$escapeSizeHa
         )
         sim <- registerOutputs(f_historic_plot, sim)
       }

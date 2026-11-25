@@ -9,7 +9,7 @@ makeMultiSim <- function(firePolys = toyFirePolys(), outputsDF = NULL, reps = 1L
                          years = c(NA_integer_, NA_integer_),
                          times = list(start = 2011, end = 2013),
                          simOutputPath = NULL, objects = list(),
-                         ignitionFirePoints = toyIgnitionPoints()) {
+                         ignitionFirePoints = toyIgnitionPoints(), escapeSizeHa = NULL) {
   out <- withr::local_tempdir(.local_envir = parent.frame())
   if (is.null(simOutputPath)) simOutputPath <- out
   if (is.null(outputsDF)) {
@@ -30,10 +30,10 @@ makeMultiSim <- function(firePolys = toyFirePolys(), outputsDF = NULL, reps = 1L
   if (!is.null(firePolys)) objs$firePolys <- firePolys
   SpaDES.core::simInit(
     times = times,
-    params = list(fireSense_summary = list(
+    params = list(fireSense_summary = c(list(
       mode = "multi", reps = reps, simOutputPath = simOutputPath,
       .studyAreaName = "toySA", years = years
-    )),
+    ), if (!is.null(escapeSizeHa)) list(escapeSizeHa = escapeSizeHa))),
     modules = "fireSense_summary",
     objects = objs,
     paths = list(modulePath = modulePath, outputPath = out,
@@ -279,5 +279,17 @@ test_that("multi mode draws no burn map or per-year burn figure", {
   expect_null(called$burnSummary)
   expect_null(called$cumul)
   expect_equal(called$historic$pixelSize, 100)
+})
+
+test_that("multi mode gives plotHistoricFires the escape size, as the hindcast validation uses", {
+  called <- list()
+  fig <- withr::local_tempfile(fileext = ".png"); file.create(fig)
+  testthat::local_mocked_bindings(
+    plotHistoricFires = function(...) { called$historic <<- list(...); fig },
+    .package = "fireSenseUtils"
+  )
+  s <- makeMultiSim(times = list(start = 2011, end = 2013), escapeSizeHa = 123)
+  s <- SpaDES.core::spades(s)
+  expect_equal(called$historic$escapeSizeHa, 123)
 })
 
