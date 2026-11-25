@@ -19,7 +19,6 @@ defineModule(sim, list(
     "assertthat", "cowplot", "data.table", "fs", "ggplot2", "googledrive", "httr2",
     "FOR-CAST/fireregimetools@main (>= 0.1.0.9002)", ## fetch_nfdb_points(); load_nfdb_polys(fire_years = NULL)
     "qs2", "RColorBrewer", "reproducible", "terra", "tidyterra",
-    "raster", "rasterVis", ## TODO: remove these once fireSenseUtils::plotCumulativeBurns switched to ggplot2/tidyterra
     "PredictiveEcology/fireSenseUtils@development (>= 0.2.3.9187)", ## mosaicELFs() (9187); plotELFs(metrics, metric, metricCol, metricRange, metricTitle) (9144); plotHistoricFires(sizeCol = "SIZE_HA"); fireSenseFireCauses; fireCauseCodes() via hindcastObserved(fireCauses); hindcast*(); hindcastObserved()$points, flammableRTM; ELFmetricsFilename(); escapes from burned-area polygons (#187)
     "PredictiveEcology/SpaDES.core@development (>= 3.2.1.9077)", ## dirnamesFromSet() named by replicate id, repFiles(), resolveSimYears(), padYears()
     "PredictiveEcology/SpaDES.tools@development (>= 2.1.1.9000)"
@@ -39,8 +38,10 @@ defineModule(sim, list(
                           "percentage of the ELF's NRV tests inside the natural range; written to `simOutputPath` as ELFmap.")),
     defineParameter("nrvComparisonPath", "character", NA_character_, NA, NA,
                     desc = paste("(mode = 'ELFmap') folder with one subfolder per reported ELF, each holding below it NRV_summary's",
-                                 "`lm_nrvComparison.csv` and `st_nrvComparison.csv`. The ELFs are coloured by the percentage of those",
-                                 "tests inside the NRV (red none, green all) and the table is written to `simOutputPath` as",
+                                 "`nrvInside.csv`. The ELFs are coloured by the percentage of their tests",
+                                 "inside the NRV (red none, green all): `ELFmap` over all tests, `ELFmap_stand` over the",
+                                 "stand-level tests only, and `ELFmap_st_<metric>` for each stand-level metric (below, inside or above the NRV range).",
+                                 "The table is written to `simOutputPath` as",
                                  "`ELFmap_insideNRV.csv`. `NA`: the ELFs are filled green.")),
     defineParameter("burnProbabilityMap", "logical", TRUE, NA, NA,
                     desc = paste("(mode = 'ELFmap') also write the national maps of annual burn probability to `simOutputPath`:",
@@ -153,8 +154,8 @@ defineModule(sim, list(
 #'
 #' `init`: in single mode, schedules `save_single` at `end(sim)` (and, if `hindcastYear` is set,
 #' `hindcastRecord` every `hindcastInterval` and `hindcast` at `end(sim)`); in multi mode,
-#' runs `InitMulti()` and makes the burn summary, cumulative burn and historic
-#' fire figures. `save_single` writes `burnMap` (`.tif`) and `burnSummary` (`.csv`)
+#' runs `InitMulti()` and makes the simulated vs observed ignition, escape and area burned
+#' figures (the burn map and the burn figures are `burnSummaries`'). `save_single` writes `burnMap` (`.tif`) and `burnSummary` (`.csv`)
 #' to `outputPath(sim)`.
 #'
 #' @param sim A `simList`.
@@ -192,30 +193,6 @@ doEvent.fireSense_summary = function(sim, eventTime, eventType) {
         sim <- hindcastFigures(sim)
       } else if (P(sim)$mode == "multi") {
         sim <- InitMulti(sim)
-
-        padYear <- paddedFloatToChar(time(sim), padL = ceiling(log10(end(sim) + 1)))
-
-        f_burnSummary_plot <- fireSenseUtils::plotBurnSummary(
-          climateScenario = P(sim)$climateScenario,
-          studyAreaName = P(sim)$.studyAreaName,
-          outputDir = P(sim)$simOutputPath,
-          Nreps = max(P(sim)$reps),
-          years = P(sim)$years,
-          pixelSize = unique(terra::res(sim$rasterToMatch)),
-          simFiles = mod$simFiles
-        )
-        sim <- registerOutputs(f_burnSummary_plot, sim)
-
-        f_cumulBurn_plot <- fireSenseUtils::plotCumulativeBurns(
-          climateScenario = P(sim)$climateScenario,
-          studyAreaName = P(sim)$.studyAreaName,
-          outputDir = P(sim)$simOutputPath,
-          Nreps = max(P(sim)$reps),
-          years = P(sim)$years,
-          rasterToMatch = sim$rasterToMatch,
-          simFiles = mod$simFiles
-        )
-        sim <- registerOutputs(f_cumulBurn_plot, sim)
 
         f_historic_plot <- fireSenseUtils::plotHistoricFires(
           climateScenario = as.character(P(sim)$climateScenario),
@@ -487,31 +464,63 @@ filesBelow <- function(path, ELF, pattern) list.files(file.path(path, ELF), patt
 
 #' Percentage of each ELF's NRV tests inside the natural range (mode = 'ELFmap')
 #'
-#' Reads `lm_nrvComparison.csv` and `st_nrvComparison.csv` (NRV_summary; columns `poly`, `metric`, `lo`, `hi`,
-#' `mid`, `current`, `position` = "inside", "above" or "below") found anywhere below `<path>/<ELF>/`. As on the
-#' NRV page, `st` rows of a `lead_` metric with `current == 0` and `hi == 0` (a tree type that leads nowhere,
-#' now or in the NRV years) are not tests. An ELF missing either table is warned about and left out.
+#' Reads the `nrvInside.csv` NRV_summary writes (columns `poly`, `group`, `nTests`, `nInside`, `pctInside`; one row
+#' per analysis group, `landscape` and `stand`, with its lead-nowhere rule applied) found anywhere below
+#' `<path>/<ELF>/`. The count of all groups is summed; the stand-level tests alone give `pctInsideStand` (`NA` for a
+#' file without a `stand` group). An ELF without the file is warned about and left out.
 #'
 #' @param ELFs Character, the ELFs to read.
 #' @param path Folder with one subfolder per ELF.
 #'
-#' @return A `data.table` with `ELF`, `nTests`, `nInside` and `pctInside` (`100 * nInside / nTests`).
+#' @return A `data.table` with `ELF`, `nTests`, `nInside`, `pctInside` (`100 * nInside / nTests`, all groups) and
+#'   `pctInsideStand` (the same over the `stand` group's tests).
 nrvInsideTable <- function(ELFs, path) {
   one <- function(elf) {
-    lm <- filesBelow(path, elf, "^lm_nrvComparison[.]csv$"); st <- filesBelow(path, elf, "^st_nrvComparison[.]csv$")
-    if (!length(lm) || !length(st)) {
-      warning("ELF ", elf, ": no lm_nrvComparison.csv and st_nrvComparison.csv below ", file.path(path, elf),
+    file <- filesBelow(path, elf, "^nrvInside[.]csv$")
+    if (!length(file)) {
+      warning("ELF ", elf, ": no nrvInside.csv below ", file.path(path, elf),
               "; it is left out of the NRV map", call. = FALSE)
       return(NULL)
     }
-    lm <- data.table::fread(lm[1]); st <- data.table::fread(st[1])
-    st <- st[!(startsWith(st$metric, "lead_") & st$current == 0 & st$hi == 0), ]
-    position <- c(lm$position, st$position)
-    data.table::data.table(ELF = elf, nTests = length(position), nInside = sum(position == "inside"))
+    inside <- data.table::fread(file[1])
+    stand <- inside[inside$group %in% "stand", ]
+    data.table::data.table(ELF = elf, nTests = sum(inside$nTests), nInside = sum(inside$nInside),
+                           pctInsideStand = if (nrow(stand)) 100 * sum(stand$nInside) / sum(stand$nTests) else NA_real_)
   }
   tab <- data.table::rbindlist(lapply(ELFs, one))
   tab$pctInside <- 100 * tab$nInside / tab$nTests
+  data.table::setcolorder(tab, c("ELF", "nTests", "nInside", "pctInside", "pctInsideStand"))
   tab
+}
+
+## The colours of the NRV page's positions (NRV_summary's `.positionColour`: colour-blind safe) in the order of the
+## position codes below (-1), inside (0), above (+1)
+positionColours <- c("#2166ac", "#1b9e77", "#7b3294")
+
+#' Position of each ELF's stand-level tests relative to the NRV (mode = 'ELFmap')
+#'
+#' Reads the `st_nrvComparison.csv` NRV_summary writes below `<path>/<ELF>/` (the rows of the ELF's own polygon,
+#' `poly == ELF`) and keeps the rows it marks `tested`: the lead-nowhere rule is NRV_summary's. An ELF without
+#' the file is warned about and left out.
+#'
+#' @param ELFs Character, the ELFs to read.
+#' @param path Folder with one subfolder per ELF.
+#'
+#' @return A `data.table` with `ELF`, `metric`, `label` and `code` (-1 below, 0 inside, 1 above the NRV range).
+nrvStandPositions <- function(ELFs, path) {
+  one <- function(elf) {
+    files <- filesBelow(path, elf, "^st_nrvComparison[.]csv$")
+    if (!length(files)) {
+      warning("ELF ", elf, ": no st_nrvComparison.csv below ", file.path(path, elf),
+              "; it is left out of the stand-level maps", call. = FALSE)
+      return(NULL)
+    }
+    cmp <- data.table::rbindlist(lapply(files, data.table::fread), fill = TRUE)
+    cmp <- cmp[cmp$poly %in% elf & cmp$tested %in% TRUE, ]
+    data.table::data.table(ELF = rep(elf, nrow(cmp)), metric = cmp$metric, label = cmp$label,
+                           code = c(below = -1, inside = 0, above = 1)[cmp$position])
+  }
+  data.table::rbindlist(lapply(ELFs, one))
 }
 
 #' Map of Canada's ELFs with `reportedELFs` filled (mode = 'ELFmap')
@@ -520,27 +529,43 @@ nrvInsideTable <- function(ELFs, path) {
 #' `sim$ELFs` already has fireSense_ELFs' merges applied, so no merge plan is applied again, and no ELF
 #' is shaded as few-fire or not fitted: only the reported ones are filled, green, or, with
 #' `nrvComparisonPath`, red to green by `nrvInsideTable()` (also written to `simOutputPath` as
-#' `ELFmap_insideNRV.csv`).
+#' `ELFmap_insideNRV.csv`) over all tests (`ELFmap`) and, in a second map with the same scale, over the
+#' stand-level tests only (`ELFmap_stand`), and one map per stand-level metric, `ELFmap_st_<metric>`, each ELF
+#' coloured by its position (below, inside, above the NRV range; `nrvStandPositions()`) and unfilled where the metric
+#' is not a test. `plotELFs()` takes a numeric value and cannot label its legend breaks, so the position goes in as a code (-1, 0, 1) with three colours, and the title says what the codes mean.
 #'
 #' @param sim A `simList`.
 #'
 #' @return The `simList`, invisibly.
 reportedELFsMap <- function(sim) {
   if (is.null(sim$ELFs)) stop("fireSense_summary mode = 'ELFmap' needs `ELFs` (fireSense_ELFs' output)")
-  colouring <- list(fill = "green")
-  if (!is.na(P(sim)$nrvComparisonPath)) {
+  drawMap <- function(colouring, filename) {
+    do.call(Plots, c(list(fn = fireSenseUtils::plotELFs, ELFs = sim$ELFs, which = P(sim)$reportedELFs),
+                     colouring,
+                     list(plan = data.frame(ELF = character(0), action = character(0)),
+                          fewFires = character(0), fewFiresFill = NA, arcticFill = NA,
+                          labels = "code", labelWhich = "highlighted", buffers = FALSE, axes = "none",
+                          filename = filename, path = P(sim)$simOutputPath, types = P(sim)$.plots,
+                          deviceArgs = list(width = 10, height = 7.5, units = "in", res = 100))))
+  }
+  if (is.na(P(sim)$nrvComparisonPath)) {
+    drawMap(list(fill = "green"), "ELFmap")
+  } else {
     inside <- nrvInsideTable(P(sim)$reportedELFs, P(sim)$nrvComparisonPath)
     data.table::fwrite(inside, file.path(P(sim)$simOutputPath, "ELFmap_insideNRV.csv"))
-    colouring <- list(metrics = inside, metric = "pctInside", metricCol = grDevices::hcl.colors(100, "RdYlGn"),
-                      metricRange = c(0, 100), metricTitle = "% of tests\ninside the NRV")
+    nrvColours <- function(metric, title)
+      list(metrics = inside, metric = metric, metricCol = grDevices::hcl.colors(100, "RdYlGn"),
+           metricRange = c(0, 100), metricTitle = title)
+    drawMap(nrvColours("pctInside", "% of tests\ninside the NRV"), "ELFmap")
+    drawMap(nrvColours("pctInsideStand", "% of stand tests\ninside the NRV"), "ELFmap_stand")
+    positions <- nrvStandPositions(P(sim)$reportedELFs, P(sim)$nrvComparisonPath)
+    for (m in unique(positions$metric)) {
+      pm <- positions[positions$metric == m, ]
+      drawMap(list(fill = NA, metrics = pm, metric = "code", metricCol = positionColours, metricRange = c(-1, 1),
+                   metricTitle = paste0(pm$label[1], "\n-1 below \u00b7 0 inside \u00b7 1 above")),
+              paste0("ELFmap_st_", gsub("[^A-Za-z0-9_.-]", "_", m)))
+    }
   }
-  do.call(Plots, c(list(fn = fireSenseUtils::plotELFs, ELFs = sim$ELFs, which = P(sim)$reportedELFs),
-                   colouring,
-                   list(plan = data.frame(ELF = character(0), action = character(0)),
-                        fewFires = character(0), fewFiresFill = NA, arcticFill = NA,
-                        labels = "code", labelWhich = "highlighted", buffers = FALSE, axes = "none",
-                        filename = "ELFmap", path = P(sim)$simOutputPath, types = P(sim)$.plots,
-                        deviceArgs = list(width = 10, height = 7.5, units = "in", res = 100))))
   if (isTRUE(P(sim)$burnProbabilityMap)) burnProbabilityMaps(sim)
   invisible(sim)
 }
@@ -571,6 +596,23 @@ burnProbabilityMaps <- function(sim) {
   filename <- file.path(P(sim)$simOutputPath, paste0(names(files), ".tif"))
   names(filename) <- names(files)
   invisible(fireSenseUtils::mosaicELFs(files, sim$ELFs, filename))
+}
+
+#' Observed fires of the study area only, with a date
+#'
+#' The National Fire Database covers Canada and marks an undated fire `YEAR = -9999`. Keeps the fires
+#' (polygons or points) that have a `YEAR` above 0 and touch the extent of `rasterToMatch`.
+#'
+#' @param x A `SpatVector` with a `YEAR` column.
+#' @param rasterToMatch The template `SpatRaster`.
+#'
+#' @return `x` without the undated fires and the fires outside `rasterToMatch`.
+observedInStudyArea <- function(x, rasterToMatch) {
+  if (!terra::same.crs(x, rasterToMatch)) x <- terra::project(x, rasterToMatch)
+  year <- as.integer(x$YEAR)
+  inside <- terra::relate(x, terra::as.polygons(terra::ext(rasterToMatch), crs = terra::crs(rasterToMatch)),
+                          "intersects")[, 1]
+  x[which(!is.na(year) & year > 0L & inside), ]
 }
 
 #' Find the replicate output files and the historical fires (multi mode)
@@ -666,8 +708,6 @@ InitMulti <- function(sim) {
                                                       study_area = sim$rasterToMatch, min_size_ha = 0) |>
       tidyterra::mutate(MONTH = as.integer(MONTH), DAY = as.integer(DAY))
   }
-  ## NFDB's YEAR is -9999 when the year is unknown; plotted, such fires were a year -9999
-  mod$firePolys <- mod$firePolys[!mod$firePolys$YEAR %in% -9999L, ]
 
   ## NFDB points, harmonised and clipped to the template raster by fireregimetools (the URL this
   ## module used to hard-code, .../NFDB_point.zip, returns 404 now)
@@ -676,6 +716,10 @@ InitMulti <- function(sim) {
   } else {
     fireregimetools::fetch_nfdb_points(sim$rasterToMatch, dest = inputPath(sim))
   }
+
+  ## the simulations cover the study area and every year; the observed record must too
+  mod$firePolys <- observedInStudyArea(mod$firePolys, sim$rasterToMatch)
+  mod$ignitionFirePoints <- observedInStudyArea(mod$ignitionFirePoints, sim$rasterToMatch)
 
   return(invisible(sim))
 }

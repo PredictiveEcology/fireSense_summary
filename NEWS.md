@@ -2,6 +2,14 @@
 
 - Multi mode takes a replicate's files only from that replicate's folder, so `rep1` no longer picks up `rep10`'s, and without `outputsDF` a replicate's number no longer matches any path containing it (e.g. `1` in `_year2013`). A replicate in `reps` with no outputs now stops, naming it; with `outputsDF` it used to take every replicate's files. Needs SpaDES.core >= 3.2.1.9077 (`dirnamesFromSet()` named by replicate id, PredictiveEcology/SpaDES.core#543).
 
+- `mode = "ELFmap"` with `nrvComparisonPath` reads each ELF's count from NRV_summary's `nrvInside.csv` (columns `poly`, `group`, `nTests`, `nInside`, `pctInside`; one row per analysis group) instead of recomputing it from `lm_nrvComparison.csv` and `st_nrvComparison.csv`, so the lead-nowhere rule lives in NRV_summary only. `ELFmap` is coloured by all groups' tests; a second map, `ELFmap_stand`, on the same 0-100 scale, by the stand-level tests only (`pctInsideStand` in `ELFmap_insideNRV.csv`), and one map per stand-level metric, `ELFmap_st_<metric>`, each ELF coloured by whether the metric is below, inside or above its NRV range (from `st_nrvComparison.csv`, `tested` rows only; ELFs where it is not a test are unfilled). An ELF without the file is warned about and left out. Depends-on: PredictiveEcology/NRV_summary (nrvInside.csv by group PR).
+
+- Multi mode no longer makes the cumulative burn map (`plotCumulativeBurns()`) or the per-year burn figure (`plotBurnSummary()`); `burnSummaries` makes both. `raster` and `rasterVis` are no longer in `reqdPkgs`.
+
+- Multi mode's `simulated_*` figures compare with the observed fires of the study area only: undated fires (`YEAR` -9999) and fires outside `rasterToMatch` are dropped, for the NFDB polygons and the points.
+
+- The test helper `runInitMulti()` calls `SpaDES.core::start()`: in the package rendition `start` was `stats::start`, which gave a two-row `current` and failed 12 `InitMulti` tests.
+
 - `mode = "ELFmap"` also writes the national maps of annual burn probability, `NRVburnProbability.tif` (simulated) and `NRVburnProbabilityHistoric.tif` (observed), to `simOutputPath`: cloud-optimized GeoTIFFs in EPSG:3978 made by `fireSenseUtils::mosaicELFs()` from the reported ELFs' `meanAnnualCumulBurnMap.tif` and `meanAnnualCumulBurnMapHistoric.tif` (burnSummaries), blended across the overlaps of the ELFs' buffers. New parameter `burnProbabilityMap` (default `TRUE`); `FALSE` draws only the ELF map. Needs fireSenseUtils with `mosaicELFs()`.
 
 - The metrics row records when the run's fits were written: `spreadFitWrittenAt` and `ignitionFitWrittenAt` (UTC; the oldest over the run's ELFs), from the ledger rows' `writtenAt` (`spreadFitPreRun`, and fireSense_ELFs' `ignitionFitWrittenAt`). `fireSenseUtils::readELFmetrics()` orders runs by them, since ledger file names are labels and need not carry a date.
