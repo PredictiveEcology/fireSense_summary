@@ -1,5 +1,7 @@
 # fireSense_summary (development version)
 
+* The README shows the module's events, the objects each reads and writes, and a figure per event, generated from the code (needs SpaDES.core 3.2.1.9068 or later; older versions leave them out).
+
 * `simOutputPath` is no longer part of the module's event cache keys (`defineParameter(cacheKey = FALSE)`; SpaDES.core >= 3.2.1.9047). Single mode never reads it (a default of `outputPath(sim)`, which differs between machines); multi mode is not cached by default. The event cache keys of this module change once.
 
 * New parameter `repMaps` (default `TRUE`: no change). `FALSE` makes `hindcastRecord()` skip the per-rep tifs (`hindcast_burnID_rep<rep>.tif`, `hindcast_ignitionProb_rep<rep>.tif`, `hindcast_escapeProb_rep<rep>.tif`) and the module no longer needs `fireSense_IgAndEscapeProbRas`, so a replay job without an ignition module can run it. The tables, observed files and burn summary are unchanged.
