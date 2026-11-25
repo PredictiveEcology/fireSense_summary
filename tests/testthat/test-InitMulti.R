@@ -238,7 +238,7 @@ test_that("observed ignition points are only the dated fires inside the study ar
   expect_equal(sort(modOf(s)$ignitionFirePoints$YEAR), c(1990L, 1991L))
 })
 
-test_that("multi mode draws no burn map or per-year burn figure, and counts escapes at escapeSizeHa", {
+test_that("multi mode draws no burn map or per-year burn figure", {
   called <- list()
   fig <- withr::local_tempfile(fileext = ".png"); file.create(fig)
   testthat::local_mocked_bindings(
@@ -254,8 +254,6 @@ test_that("multi mode draws no burn map or per-year burn figure, and counts esca
   s <- SpaDES.core::spades(s)
   expect_null(called$burnSummary)
   expect_null(called$cumul)
-  ## the template has 100 m pixels (1 ha); an escape is still escapeSizeHa (50 ha)
-  expect_equal(called$historic$escapeSizeHa, 50)
   expect_equal(called$historic$pixelSize, 100)
 })
 
