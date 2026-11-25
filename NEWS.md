@@ -1,5 +1,7 @@
 # fireSense_summary (development version)
 
+- Multi mode takes a replicate's files only from that replicate's folder, so `rep1` no longer picks up `rep10`'s, and without `outputsDF` a replicate's number no longer matches any path containing it (e.g. `1` in `_year2013`). A replicate in `reps` with no outputs now stops, naming it; with `outputsDF` it used to take every replicate's files. Needs SpaDES.core >= 3.2.1.9077 (`dirnamesFromSet()` named by replicate id, PredictiveEcology/SpaDES.core#543).
+
 - `mode = "ELFmap"` also writes the national maps of annual burn probability, `NRVburnProbability.tif` (simulated) and `NRVburnProbabilityHistoric.tif` (observed), to `simOutputPath`: cloud-optimized GeoTIFFs in EPSG:3978 made by `fireSenseUtils::mosaicELFs()` from the reported ELFs' `meanAnnualCumulBurnMap.tif` and `meanAnnualCumulBurnMapHistoric.tif` (burnSummaries), blended across the overlaps of the ELFs' buffers. New parameter `burnProbabilityMap` (default `TRUE`); `FALSE` draws only the ELF map. Needs fireSenseUtils with `mosaicELFs()`.
 
 - The metrics row records when the run's fits were written: `spreadFitWrittenAt` and `ignitionFitWrittenAt` (UTC; the oldest over the run's ELFs), from the ledger rows' `writtenAt` (`spreadFitPreRun`, and fireSense_ELFs' `ignitionFitWrittenAt`). `fireSenseUtils::readELFmetrics()` orders runs by them, since ledger file names are labels and need not carry a date.

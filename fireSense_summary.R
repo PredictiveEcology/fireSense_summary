@@ -21,7 +21,7 @@ defineModule(sim, list(
     "qs2", "RColorBrewer", "reproducible", "terra", "tidyterra",
     "raster", "rasterVis", ## TODO: remove these once fireSenseUtils::plotCumulativeBurns switched to ggplot2/tidyterra
     "PredictiveEcology/fireSenseUtils@development (>= 0.2.3.9187)", ## mosaicELFs() (9187); plotELFs(metrics, metric, metricCol, metricRange, metricTitle) (9144); plotHistoricFires(sizeCol = "SIZE_HA"); fireSenseFireCauses; fireCauseCodes() via hindcastObserved(fireCauses); hindcast*(); hindcastObserved()$points, flammableRTM; ELFmetricsFilename(); escapes from burned-area polygons (#187)
-    "PredictiveEcology/SpaDES.core@development (>= 3.2.1.9038)", ## dirnamesFromSet(leafOnly = FALSE) returns the rep folder, resolveSimYears(), padYears()
+    "PredictiveEcology/SpaDES.core@development (>= 3.2.1.9077)", ## dirnamesFromSet() named by replicate id, repFiles(), resolveSimYears(), padYears()
     "PredictiveEcology/SpaDES.tools@development (>= 2.1.1.9000)"
   ),
   parameters = rbind(
@@ -598,6 +598,20 @@ InitMulti <- function(sim) {
     )
   }
   mod$allReps <- dirnamesFromSet(filesOnDisk, P(sim)$reps)
+  ## each replicate's folder, named by replicate id; with no files at all, where the folders are expected
+  repDirs <- if (length(filesOnDisk)) {
+    dirnamesFromSet(filesOnDisk, P(sim)$reps, leafOnly = FALSE)
+  } else {
+    stats::setNames(file.path(P(sim)$simOutputPath, mod$allReps), names(mod$allReps))
+  }
+  missingReps <- setdiff(P(sim)$reps, as.integer(names(repDirs)))
+  if (length(missingReps)) {
+    stop("no ", if (mod$useOutputs) "outputs in outputsDF" else paste("replicate folder under", P(sim)$simOutputPath),
+         " for replicate ", paste(missingReps, collapse = ", "))
+  }
+  ## a file belongs to a replicate only if it is under that replicate's folder, so rep1 is not rep10
+  inReps <- vapply(filesOnDisk, function(f) any(startsWith(f, paste0(repDirs, "/"))), logical(1),
+                   USE.NAMES = FALSE)
   ## assigned back: P(sim)$years is read downstream, not just for padding
   P(sim)$years <- resolveSimYears(P(sim)$years, sim)
   pad <- padYears(P(sim)$years)
@@ -605,35 +619,20 @@ InitMulti <- function(sim) {
   checkPath(file.path(P(sim)$simOutputPath, "figures", currentModule(sim)), create = TRUE)
 
   if (mod$useOutputs) {
-    mod$bmbs <- grep(
-      value = TRUE,
-      filesOnDisk,
-      pattern = bmbPattern
-    ) |>
-      grep(paste0("(", paste0(mod$allReps, collapse = "|"), ")"), x = _, value = TRUE) |>
-      grep("gri|png|txt|xml", x = _, value = TRUE, invert = TRUE)
+    mod$bmbs <- filesOnDisk[inReps & grepl(bmbPattern, filesOnDisk) & !grepl("gri|png|txt|xml", filesOnDisk)]
 
   } else {
-    inReps <- grepl(paste0("(", paste0(P(sim)$reps, collapse = "|"), ")"), filesOnDisk)
     ## the year is in the burn map names only; the burn summary csv has none
     inYears <- !grepl("burnMap", filesOnDisk) |
       grepl(paste0("_year(", paste0(P(sim)$years, collapse = "|"), ")"), filesOnDisk)
     mod$bmbs <- filesOnDisk[inReps & inYears]
 
-    if (length(mod$allReps) < length(P(sim)$reps)) {
-      stop("replicate folders appear to be missing under ", P(sim)$simOutputPath,
-           ": found ", length(mod$allReps), " of ", length(P(sim)$reps))
-    }
-
     filesUserHas <- c(mod$bmbs)
 
-    dirsExpected <- file.path(P(sim)$simOutputPath, mod$allReps)
-    filesExpected <- as.character(sapply(dirsExpected, function(d) {
-      c(
-        file.path(d, sprintf("burnMap_year%04d.tif", P(sim)$years[2])),
-        file.path(d, "fireSense_burnSummary.csv")
-      )
-    }))
+    filesExpected <- as.vector(rbind(
+      repFiles(repDirs, sprintf("burnMap_year%04d.tif", P(sim)$years[2])),
+      repFiles(repDirs, "fireSense_burnSummary.csv")
+    ))
 
     filesNeeded <- data.frame(file = filesExpected, exists = filesExpected %in% filesUserHas)
 
