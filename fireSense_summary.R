@@ -129,7 +129,7 @@ defineModule(sim, list(
 #' @param eventType `"init"`, `"save_single"`, `"hindcastRecord"` or `"hindcast"`.
 #'
 #' @return The `simList`, invisibly.
-doEvent.fireSense_summary = function(sim, eventTime, eventType) {
+doEvent.fireSense_summary <- function(sim, eventTime, eventType) {
   switch(
     eventType,
     init = {
