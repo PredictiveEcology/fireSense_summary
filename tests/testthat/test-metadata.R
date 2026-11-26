@@ -18,10 +18,13 @@ test_that("inputs are the expected names and classes", {
   expected <- c(.ELFind            = "character",
       burnMap            = "SpatRaster",
       burnSummary        = "data.table",
+      ELFs               = "list",
       firePolys          = "list",
       fireSense_IgAndEscapeProbRas = "SpatRaster",
       fireSense_annualSpreadFitCovariates = "list",
       fireSense_nonAnnualSpreadFitCovariates = "list",
+      fireSense_IgnitionFittedList = "list",
+      fireSense_SpreadParamSet = "integer",
       flammableRTM       = "SpatRaster",
       ignitionFirePoints = "SpatVector",
       ignitionsAndEscapes = "data.table",
@@ -29,6 +32,7 @@ test_that("inputs are the expected names and classes", {
       rasterToMatch      = "SpatRaster",
       rasterToMatchELF   = "SpatRaster",
       rstAnnualBurnID    = "SpatRaster",
+      spreadFitPreRun    = "data.frame",
       studyArea          = "sf",
       studyAreaWithSpreadParams = "data.frame")
   ## by name, not by sort order: that depends on the locale
@@ -45,8 +49,8 @@ test_that("parameters are the expected names", {
   md <- SpaDES.core::moduleMetadata(module = moduleName, path = modulePath)
   expect_identical(
     sort(md$parameters$paramName),
-    sort(c(".runName", "climateScenario", "commonalityLedgerFolder", "commonalityLedgers", "escapeSizeHa", "fireCauses", "hindcastInterval", "hindcastYear", "mode", "repMaps", "reps",
-           "simOutputPath", "studyAreaName", "years"))
+    sort(c(".neverCache", ".plots", ".runName", ".studyAreaName", "burnProbabilityMap", "climateScenario", "commonalityLedgerFolder", "commonalityLedgers", "escapeSizeHa", "fireCauses", "hindcastInterval",
+           "hindcastYear", "mode", "nrvComparisonPath", "reportedELFs", "repMaps", "reps", "simOutputPath", "years"))
   )
 })
 
@@ -64,12 +68,13 @@ test_that("parameter classes and defaults are as declared", {
   p <- md$parameters[order(md$parameters$paramName), ]
   expect_identical(
     stats::setNames(unlist(p$paramClass), p$paramName),
-    c(.runName = "character", climateScenario = "character", commonalityLedgerFolder = "character",
+    c(.neverCache = "character", .plots = "character", .runName = "character", .studyAreaName = "character", burnProbabilityMap = "logical", climateScenario = "character", commonalityLedgerFolder = "character",
       commonalityLedgers = "character", escapeSizeHa = "numeric", fireCauses = "character", hindcastInterval = "numeric",
-      hindcastYear = "integer", mode = "character", repMaps = "logical", reps = "integer",
-      simOutputPath = "character", studyAreaName = "character", years = "integer")
+      hindcastYear = "integer", mode = "character", nrvComparisonPath = "character", repMaps = "logical", reportedELFs = "character", reps = "integer",
+      simOutputPath = "character", years = "integer")
   )
   dflt <- stats::setNames(p$default, p$paramName)
+  expect_identical(dflt$.plots, "screen")
   expect_identical(dflt$mode, "single")
   expect_identical(dflt$reps, 1L:10L)
   ## all-NA on purpose: resolveSimYears() fills it from the sim clock, so the module
@@ -79,8 +84,8 @@ test_that("parameter classes and defaults are as declared", {
   ## no hindcast unless asked, and whole-year steps between rep-years if it is
   expect_true(is.na(dflt$hindcastYear))
   expect_identical(dflt$hindcastInterval, 1)
+  expect_true(is.na(dflt$.studyAreaName))
   expect_true(dflt$repMaps)
-  expect_true(is.na(dflt$studyAreaName))
   expect_true(is.na(dflt$.runName))
   expect_true(is.na(dflt$commonalityLedgers))       # no commonality partition unless asked
 })
@@ -120,4 +125,9 @@ test_that("`simOutputPath` is not part of the module's cache keys", {
   p <- SpaDES.core::moduleMetadata(module = moduleName, path = modulePath)$parameters
   expect_false(p$cacheKey[p$paramName == "simOutputPath"])
   expect_true(all(p$cacheKey[p$paramName != "simOutputPath"]))
+})
+
+test_that("no figure of the module needs raster or rasterVis (burnSummaries makes the burn map)", {
+  reqd <- unlist(SpaDES.core::moduleMetadata(module = moduleName, path = modulePath)$reqdPkgs)
+  expect_false(any(c("raster", "rasterVis") %in% reqd))
 })
