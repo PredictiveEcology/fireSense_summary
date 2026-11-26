@@ -74,6 +74,53 @@ test_that("with commonalityLedgers, the four fits of the ELF give the commonalit
   expect_equal(share("between", "climate"), 1, tolerance = 1e-9)
   expect_equal(share("between", "fuel"), 0)
   expect_equal(share("within", "unexplained"), 0.4^2)
+  expect_identical(unique(cp$annualSource[cp$signal == "between"]), "inSample")   # no hindcasts given
+})
+
+test_that("with commonalityHindcastPaths, the between-year score comes from the hindcast annual areas", {
+  obs <- c(10, 200, 50, 3000, 20, 800, 5, 100)
+  yrs <- 2001:2008
+  ## in sample every fit tracks the observed areas; in the hindcasts only those with climate do
+  fit <- function(fireRMSE) {
+    r <- toyPartitionObjects()$studyAreaWithSpreadParams
+    r[[fireSenseUtils::spreadFitInSampleSizesTxt]] <- rep(list(list(
+      sizes = data.table::data.table(fireRMSE = fireRMSE),
+      byYear = data.table::data.table(yr = yrs, obs = obs, simMedian = obs))), 2)
+    r
+  }
+  ledgers <- list(fNone = fit(1), fClim = fit(0.8), fFuel = fit(0.5), fBoth = fit(0.4))
+  testthat::local_mocked_bindings(readSpreadFitLedger = function(spreadFitFilename, ...) ledgers[[spreadFitFilename]],
+                                  .package = "fireSenseUtils")
+  hcRoot <- withr::local_tempdir()
+  writeHindcast <- function(fit, sim) {
+    for (i in seq_along(yrs)) {
+      d <- file.path(hcRoot, fit, "4.1", yrs[i], "1")
+      dir.create(d, recursive = TRUE)
+      data.table::fwrite(data.table::data.table(rep = 1:3, year = yrs[i], areaBurnedHa = sim[i] * c(0.5, 1, 2)),
+                         file.path(d, "hindcast_reps.csv"))
+      data.table::fwrite(data.table::data.table(year = yrs[i], areaBurnedHa = obs[i]), file.path(d, "hindcast_observed.csv"))
+    }
+    file.path(hcRoot, fit)
+  }
+  paths <- c(none = writeHindcast("n", rep(100, 8)), climate = writeHindcast("c", obs), fuel = writeHindcast("f", rep(100, 8)),
+             climateFuel = writeHindcast("cf", obs))
+  out <- withr::local_tempdir()
+  objs <- toyPartitionObjects()
+  objs$studyArea <- sf::st_as_sf(terra::vect("POLYGON ((0 0, 1 0, 1 1, 0 1, 0 0))", crs = "EPSG:3978"))
+  s <- SpaDES.core::simInit(
+    times = list(start = 2005, end = 2005),
+    params = list(fireSense_summary = list(mode = "variancePartition", .plots = NA, commonalityHindcastPaths = paths,
+                                           commonalityLedgers = c(none = "fNone", climate = "fClim", fuel = "fFuel",
+                                                                  climateFuel = "fBoth"))),
+    modules = "fireSense_summary", objects = objs,
+    paths = list(modulePath = modulePath, outputPath = out, cachePath = file.path(out, "cache"),
+                 inputPath = file.path(out, "in")))
+  SpaDES.core::spades(s, debug = FALSE)
+  vp <- data.table::fread(file.path(out, "variancePartition.csv"))
+  cp <- vp[vp$method == "commonality" & vp$signal == "between", ]
+  expect_identical(unique(cp$annualSource), "hindcast")
+  expect_equal(cp$share[cp$part == "climate"], 1)          # in sample it would be all shared, none unique
+  expect_equal(cp$share[cp$part == "shared"], 0)
 })
 
 test_that("mode 'variancePartition' stops, naming them, without the fit's covariates", {

@@ -60,6 +60,12 @@ defineModule(sim, list(
                                  "`climate`, `fuel` and `climateFuel` (no covariate, climate only, fuel only, both), e.g. the",
                                  "files of FireSenseTesting's trials; read from `commonalityLedgerFolder`, the rows within",
                                  "`studyArea`. `NA` (default): no commonality partition, only the model-based one.")),
+    defineParameter("commonalityHindcastPaths", "character", NA_character_, NA, NA,
+                    desc = paste("(mode = 'variancePartition') the hindcast output folders of the fits of `commonalityLedgers`,",
+                                 "named as they are; each holds `<ELF>/<year>/<set>/` with `hindcast_reps.csv` and",
+                                 "`hindcast_observed.csv`. When all four fits of an ELF have hindcasts, the commonality",
+                                 "between-year score uses their annual areas, else the fits' in-sample ones (column `annualSource`).",
+                                 "`NA` (default): the in-sample ones.")),
     defineParameter("commonalityLedgerFolder", "character", fireSenseUtils::spreadFitLedgerFolder(testing = TRUE), NA, NA,
                     desc = "(mode = 'variancePartition') the Google Drive folder of `commonalityLedgers`."),
     defineParameter("simOutputPath", "character", outputPath(sim), NA, NA,
@@ -446,6 +452,10 @@ fitWrittenAt <- function(sim) {
   c(spread = oldest(spread), ignition = oldest(ign[names(ign) %in% ELFinds]))
 }
 
+## The hindcast table `name` (of hindcastFiles) of each folder of `dirs`, row-bound, with `set`, the folder's position
+readHindcastTable <- function(dirs, name) data.table::rbindlist(lapply(seq_along(dirs), function(i)
+  cbind(set = i, data.table::fread(file.path(dirs[i], hindcastFiles[[name]])))), fill = TRUE)
+
 #' Hindcast figures, pooling the replicate folders (multi mode)
 #'
 #' Reads the files `hindcastSave()` wrote in each replicate folder (a parameter set each) and draws, through
@@ -459,10 +469,8 @@ hindcastFigures <- function(sim) {
   dirs <- file.path(P(sim)$simOutputPath, dirnamesFromSet(sim$outputsDF$file, P(sim)$reps))
   dirs <- dirs[dir.exists(dirs)]
   if (!length(dirs)) stop("no replicate folders found in ", P(sim)$simOutputPath)
-  readAll <- function(name) data.table::rbindlist(lapply(seq_along(dirs), function(i)
-    cbind(set = i, data.table::fread(file.path(dirs[i], hindcastFiles[[name]])))))
-  reps <- readAll("reps")
-  sizes <- readAll("sizes")
+  reps <- readHindcastTable(dirs, "reps")
+  sizes <- readHindcastTable(dirs, "sizes")
   obs <- list(counts = data.table::fread(file.path(dirs[1], hindcastFiles[["observed"]])),
               sizes = data.table::fread(file.path(dirs[1], hindcastFiles[["observedSizes"]])))
   polyFile <- file.path(dirs[1], hindcastFiles[["observedPolys"]])
@@ -509,7 +517,9 @@ variancePartitionSave <- function(sim) {
     fits <- commonalityRows(sim)
     out <- c(out, lapply(ELFs, function(elf) {
       byFit <- lapply(fits, function(r) ledgerRowsOf(r, elf))
-      cbind(ELF = elf, method = "commonality", fireSenseUtils::commonalityPartition(fireSenseUtils::commonalityScores(byFit)))
+      areas <- lapply(P(sim)$commonalityHindcastPaths, hindcastAnnualAreasOf, elf = elf)
+      scores <- fireSenseUtils::commonalityScores(byFit, annualAreas = areas)
+      cbind(ELF = elf, method = "commonality", fireSenseUtils::commonalityPartition(scores))
     }))
   }
   tab <- as.data.frame(data.table::rbindlist(out, fill = TRUE))
@@ -542,6 +552,16 @@ ledgerRowsOf <- function(rows, ELFs) {
     stop("mode 'variancePartition': each ELF needs one ledger row; ",
          paste0(names(n), " has ", n, collapse = ", "))
   rows[match(as.character(ELFs), ids), , drop = FALSE]
+}
+
+## The annual areas of the hindcasts of ELF `elf` below `path` (`<path>/<elf>/<year>/<set>/`), every year and set pooled
+## (fireSenseUtils::hindcastAnnualAreas()); NULL when `path` is NA or holds none
+hindcastAnnualAreasOf <- function(path, elf) {
+  if (is.na(path)) return(NULL)
+  dirs <- dirname(Sys.glob(file.path(path, elf, "*", "*", hindcastFiles[["reps"]])))
+  dirs <- dirs[file.exists(file.path(dirs, hindcastFiles[["observed"]]))]
+  if (!length(dirs)) return(NULL)
+  fireSenseUtils::hindcastAnnualAreas(readHindcastTable(dirs, "reps"), readHindcastTable(dirs, "observed"))
 }
 
 ## The rows within `studyArea` of each of the four `commonalityLedgers`, a list named as they are (commonalityScores() checks

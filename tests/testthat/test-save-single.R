@@ -229,7 +229,9 @@ test_that("simOutputPath is not in the init event's cache key: a run that differ
     out <- withr::local_tempdir(.local_envir = parent.frame())
     s <- SpaDES.core::simInit(
       times = list(start = 2011, end = 2013),
-      params = list(fireSense_summary = list(mode = "single", simOutputPath = simOutputPath, .useCache = "init")),
+      ## `.neverCache` lists init (a cache hit would write nothing); emptied here, to test the key alone
+      params = list(fireSense_summary = list(mode = "single", simOutputPath = simOutputPath, .useCache = "init",
+                                             .neverCache = character())),
       modules = "fireSense_summary",
       objects = list(burnMap = toyBurnMap(), burnSummary = toyBurnSummary()),
       paths = list(modulePath = modulePath, outputPath = out, cachePath = cachePath, inputPath = file.path(out, "in")))
