@@ -22,10 +22,11 @@ Require("SpaDES.core", require = FALSE, upgrade = FALSE)
 
 # Overview
 
-Saves and summarizes `fireSense` burn results. It has two modes (parameter `mode`):
+Saves and summarizes `fireSense` burn results. It has these modes (parameter `mode`):
 
 - `"single"` (default): run inside a simulation, after `fireSense_burn`. At `end(sim)` it writes `burnMap_year<end>.tif` and `fireSense_burnSummary.csv` to `outputPath(sim)`.
 - `"multi"`: run on its own after several replicates have finished. It finds each replicate's burn map and burn summary and makes the simulated vs observed ignition, escape and area burned figures with `fireSenseUtils::plotHistoricFires()`; the burn map and the burn figures are `burnSummaries`'.
+- `"variancePartition"`: run after `fireSense_dataPrepFit`, in a run of one ELF. At `end(sim)` it writes `variancePartition.csv` to `outputPath(sim)`: how much of the fire signal each part of the spread model carries (climate, fuel, young stands, non-forest), between years and within years. Method `"model"` splits the fitted model's linear predictor over the fit's own pixel-years (`fireSenseUtils::spreadVariancePartition()`); method `"commonality"`, with `commonalityLedgers`, compares four fits of the ELF with and without climate and fuel (`fireSenseUtils::commonalityPartition()`). One figure per ELF and method, through `Plots()`.
 
 # Usage
 
@@ -67,6 +68,26 @@ knitr::kable(df_params)
 
 - `init`: in single mode, schedules `save_single` at `end(sim)`. In multi mode, does all the work: locates the files and makes the figures.
 - `save_single`: writes the burn map and burn summary (single mode only).
+- `variancePartition`: writes `variancePartition.csv` and its figures (mode `"variancePartition"` only).
+
+```{r eventFlowCheck-fireSense-summary, include = FALSE, eval = TRUE, cache = FALSE}
+## the generated figures need SpaDES.core 3.2.1.9068 or later; older versions skip them
+.efOK <- utils::packageVersion("SpaDES.core") >= "3.2.1.9068"
+```
+
+```{r eventFlow-fireSense-summary, echo = FALSE, eval = .efOK, cache = FALSE, out.width = "100%", fig.pos = "H", fig.cap = "fireSense_summary events, as read from the module code with its default parameters."}
+ef <- tryCatch(SpaDES.core::moduleEventFlow("fireSense_summary", path = ".."), error = function(e) e)
+SpaDES.core::includeModuleEventFlow(ef, "figures/fireSense_summary_eventFlow.png")
+```
+
+```{r eventObjects-fireSense-summary, echo = FALSE, eval = .efOK, cache = FALSE}
+SpaDES.core::kableModuleObjects(ef, caption = "Where each object of fireSense_summary is written and read, in run order.",
+                                lead = "The table below lists, for each object, the code that writes it and the code that only reads it.")
+```
+
+```{r eventFigures-fireSense-summary, echo = FALSE, eval = .efOK, cache = FALSE, results = "asis"}
+SpaDES.core::moduleEventFigures(ef, figDir = "figures", level = 2)
+```
 
 ## Plotting
 

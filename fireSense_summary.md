@@ -77,6 +77,97 @@ Historical fires for the comparison figure come from `firePolys` and `ignitionFi
 - `init`: in single mode, schedules `save_single` at `end(sim)`. In multi mode, does all the work: locates the files and makes the figures.
 - `save_single`: writes the burn map and burn summary (single mode only).
 
+
+
+<div class="figure">
+<img src="figures/fireSense_summary_eventFlow.png" alt="fireSense_summary events, as read from the module code with its default parameters." width="100%" />
+<p class="caption">fireSense_summary events, as read from the module code with its default parameters.</p>
+</div>
+
+The table below lists, for each object, the code that writes it and the code that only reads it.
+
+<table class="table" style="width: auto !important; border-bottom: 0;">
+<caption>Where each object of fireSense_summary is written and read, in run order.</caption>
+ <thead>
+  <tr>
+   <th style="text-align:left;"> Object </th>
+   <th style="text-align:left;"> Written by </th>
+   <th style="text-align:left;"> Read by </th>
+  </tr>
+ </thead>
+<tbody>
+  <tr grouplength="7"><td colspan="3" style="border-bottom: 1px solid;"><strong>Inputs</strong></td></tr>
+<tr>
+   <td style="text-align:left;padding-left: 2em;" indentlevel="1"> outputsDF </td>
+   <td style="text-align:left;">  </td>
+   <td style="text-align:left;"> init: hindcastFigures(), init: InitMulti() </td>
+  </tr>
+  <tr>
+   <td style="text-align:left;padding-left: 2em;" indentlevel="1"> firePolys </td>
+   <td style="text-align:left;">  </td>
+   <td style="text-align:left;"> init: InitMulti() </td>
+  </tr>
+  <tr>
+   <td style="text-align:left;padding-left: 2em;" indentlevel="1"> ignitionFirePoints </td>
+   <td style="text-align:left;">  </td>
+   <td style="text-align:left;"> init: InitMulti() </td>
+  </tr>
+  <tr>
+   <td style="text-align:left;padding-left: 2em;" indentlevel="1"> rasterToMatch </td>
+   <td style="text-align:left;">  </td>
+   <td style="text-align:left;"> init: InitMulti(), init (own code) </td>
+  </tr>
+  <tr>
+   <td style="text-align:left;padding-left: 2em;" indentlevel="1"> .ELFind </td>
+   <td style="text-align:left;">  </td>
+   <td style="text-align:left;"> save_single (single) </td>
+  </tr>
+  <tr>
+   <td style="text-align:left;padding-left: 2em;" indentlevel="1"> burnMap </td>
+   <td style="text-align:left;">  </td>
+   <td style="text-align:left;"> save_single (single) </td>
+  </tr>
+  <tr>
+   <td style="text-align:left;padding-left: 2em;" indentlevel="1"> burnSummary </td>
+   <td style="text-align:left;">  </td>
+   <td style="text-align:left;"> save_single (single) </td>
+  </tr>
+</tbody>
+<tfoot><tr><td style="padding: 0; " colspan="100%">
+<sup></sup> Not shown, off with the default parameters: hindcastRecord, hindcast. Not shown, touching no object in the metadata: .inputObjects. Not traced to any code (e.g. reached indirectly): ignitionsAndEscapes, fireSense_IgAndEscapeProbRas, rasterToMatchELF, flammableRTM, rstAnnualBurnID.</td></tr></tfoot>
+</table>
+
+
+## hindcastFigures() {-}
+
+init event, step 1 of 2
+
+![](figures/fireSense_summary_io_init_hindcastFigures.png){width=100%}
+
+
+
+## InitMulti() {-}
+
+init event, step 2 of 2
+
+![](figures/fireSense_summary_io_init_InitMulti.png){width=100%}
+
+
+
+## init (own code) {-}
+
+the init event's own code, outside the functions it calls
+
+![](figures/fireSense_summary_io_init_own.png){width=100%}
+
+
+
+## save\_single {-}
+
+mode = "single": once, at end
+
+![](figures/fireSense_summary_io_save_single.png){width=100%}
+
 ## Plotting
 
 Multi mode only. Figures are `.png` files under `simOutputPath`, registered in `outputs(sim)`: burn summaries across replicates, cumulative burns, and simulated versus historical ignitions, escapes and area burned.
