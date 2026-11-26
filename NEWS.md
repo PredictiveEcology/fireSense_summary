@@ -44,23 +44,6 @@
 
 - The hindcast tables `hindcast_reps.csv` and `hindcast_sizes.csv` have a `paramSet` column: the row of the fitted spread parameter sets each rep used, read from `sim$fireSense_SpreadParamSet` (from `fireSense_spreadPredict` with `paramSetByReplicate = TRUE`, or with `.rep`). `NA` when that object is absent, so older configurations run as before.
 
-# fireSense_summary 1.0.1.9003
-
-- reqdPkgs now lists `archive`, which the module calls with `::` but did not list. Version 1.0.1.9003.
-
-# fireSense_summary 1.0.1.9002
-
-- `loadOrder` now runs after `fireSense_burn` (the burn module was renamed from `fireSense`); with the old name the ordering was silently ignored.
-
-# fireSense_summary 1.0.1.9001
-
-- The parameter `studyAreaName` is renamed `.studyAreaName`, the name every other fireSense and Biomass module
-  uses for it. A project passing `studyAreaName` to this module must rename it. If it is `NA` (the default), a
-  hash of `rasterToMatch` is used, as other modules use a hash of `studyArea`.
-- `years` (already `NA`) defaults to the simulation's start and end, so a project need not repeat them here.
-- Requires SpaDES.core >= 3.2.1.9001, for `resolveSimYears()`.
-# fireSense_summary (development version)
-
 * Without `outputsDF`, `InitMulti()` takes the replicate folder names from the files found under `simOutputPath`, so `rep01` (as written by SpaDES.project experiments) is found as well as `rep1`. It used to expect `rep1` whatever was on disk. Needs SpaDES.core 3.2.1.9038 or later.
 * New parameter `repMaps` (default `TRUE`: no change). `FALSE` makes `hindcastRecord()` skip the per-rep tifs (`hindcast_burnID_rep<rep>.tif`, `hindcast_ignitionProb_rep<rep>.tif`, `hindcast_escapeProb_rep<rep>.tif`) and the module no longer needs `fireSense_IgAndEscapeProbRas`, so a replay job without an ignition module can run it. The tables, observed files and burn summary are unchanged.
 * `.inputObjects()` checks the escape definition with `fireSenseUtils::escapeDefinitionOf()` (PredictiveEcology/fireSenseUtils#222), not its own `paramCheckOtherMods()` loop. The hindcast's core raster is `rasterToMatchELF`, a core-only mask, which is `hindcastObserved()` and `hindcastSimulated()`'s default `coreIs = "mask"`. Needs fireSenseUtils with that PR.
@@ -78,6 +61,16 @@
 * The parameter `studyAreaName` is renamed `.studyAreaName`, the name every other fireSense and Biomass module uses. The old name is still accepted, with a warning, and used when `.studyAreaName` is `NA`. If both are `NA`, a hash of `rasterToMatch` is used, as other modules use a hash of `studyArea`. `reproducible` is added to `reqdPkgs`.
 
 * New parameter `hindcastYear` (default `NA`: no change) for the hindcast validation. Single mode records each rep-year (ignitions, escapes, area burned and fires of at least `escapeSizeHa` in the ELF core, from `fireSenseUtils::hindcastSimulated()`) every `hindcastInterval` and, at `end(sim)`, writes `hindcast_reps.csv`, `hindcast_sizes.csv`, `hindcast_observed.csv` (`fireSenseUtils::hindcastObserved()`), `hindcast_observedSizes.csv`, `hindcast_observedPolys.gpkg`, `hindcast_burnMap.tif` and `hindcast_burnID_rep<rep>.tif`. Rep-years may be decimal years (`rep = round((time - hindcastYear) / hindcastInterval) + 1`); the files are not named by `time(sim)`. Multi mode pools the replicate folders (parameter sets) into three `Plots()` figures: `hindcast_distributions`, `hindcast_sizes`, `hindcast_map`. New inputs `ignitionsAndEscapes`, `rasterToMatchELF`, `rstAnnualBurnID`; new parameters `escapeSizeHa`, `hindcastInterval`. Needs fireSenseUtils > 0.2.3.9091.
+
+- reqdPkgs now lists `archive`, which the module calls with `::` but did not list. Version 1.0.1.9003.
+
+- `loadOrder` now runs after `fireSense_burn` (the burn module was renamed from `fireSense`); with the old name the ordering was silently ignored.
+
+- The parameter `studyAreaName` is renamed `.studyAreaName`, the name every other fireSense and Biomass module
+  uses for it. A project passing `studyAreaName` to this module must rename it. If it is `NA` (the default), a
+  hash of `rasterToMatch` is used, as other modules use a hash of `studyArea`.
+- `years` (already `NA`) defaults to the simulation's start and end, so a project need not repeat them here.
+- Requires SpaDES.core >= 3.2.1.9001, for `resolveSimYears()`.
 
 # fireSense_summary 1.1.0
 
