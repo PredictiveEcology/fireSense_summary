@@ -15,21 +15,25 @@ test_that("module metadata parses", {
 test_that("inputs are the expected names and classes", {
   md <- SpaDES.core::moduleMetadata(module = moduleName, path = modulePath)
   inputs <- stats::setNames(md$inputObjects$objectClass, md$inputObjects$objectName)
-  expect_identical(
-    inputs[order(names(inputs))],
-    c(.ELFind            = "character",
+  expected <- c(.ELFind            = "character",
       burnMap            = "SpatRaster",
       burnSummary        = "data.table",
       firePolys          = "list",
       fireSense_IgAndEscapeProbRas = "SpatRaster",
+      fireSense_annualSpreadFitCovariates = "list",
+      fireSense_nonAnnualSpreadFitCovariates = "list",
       flammableRTM       = "SpatRaster",
       ignitionFirePoints = "SpatVector",
       ignitionsAndEscapes = "data.table",
       outputsDF          = "data.table",
       rasterToMatch      = "SpatRaster",
       rasterToMatchELF   = "SpatRaster",
-      rstAnnualBurnID    = "SpatRaster")
-  )
+      rstAnnualBurnID    = "SpatRaster",
+      studyArea          = "sf",
+      studyAreaWithSpreadParams = "data.frame")
+  ## by name, not by sort order: that depends on the locale
+  expect_setequal(names(inputs), names(expected))
+  expect_identical(inputs[names(expected)], expected)
 })
 
 test_that("no outputs are declared", {
@@ -41,7 +45,7 @@ test_that("parameters are the expected names", {
   md <- SpaDES.core::moduleMetadata(module = moduleName, path = modulePath)
   expect_identical(
     sort(md$parameters$paramName),
-    sort(c(".runName", "climateScenario", "escapeSizeHa", "fireCauses", "hindcastInterval", "hindcastYear", "mode", "repMaps", "reps",
+    sort(c(".runName", "climateScenario", "commonalityLedgerFolder", "commonalityLedgers", "escapeSizeHa", "fireCauses", "hindcastInterval", "hindcastYear", "mode", "repMaps", "reps",
            "simOutputPath", "studyAreaName", "years"))
   )
 })
@@ -60,7 +64,8 @@ test_that("parameter classes and defaults are as declared", {
   p <- md$parameters[order(md$parameters$paramName), ]
   expect_identical(
     stats::setNames(unlist(p$paramClass), p$paramName),
-    c(.runName = "character", climateScenario = "character", escapeSizeHa = "numeric", fireCauses = "character", hindcastInterval = "numeric",
+    c(.runName = "character", climateScenario = "character", commonalityLedgerFolder = "character",
+      commonalityLedgers = "character", escapeSizeHa = "numeric", fireCauses = "character", hindcastInterval = "numeric",
       hindcastYear = "integer", mode = "character", repMaps = "logical", reps = "integer",
       simOutputPath = "character", studyAreaName = "character", years = "integer")
   )
@@ -77,6 +82,7 @@ test_that("parameter classes and defaults are as declared", {
   expect_true(dflt$repMaps)
   expect_true(is.na(dflt$studyAreaName))
   expect_true(is.na(dflt$.runName))
+  expect_true(is.na(dflt$commonalityLedgers))       # no commonality partition unless asked
 })
 
 test_that("the module declares the functions the tests reach for", {

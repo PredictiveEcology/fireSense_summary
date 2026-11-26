@@ -18,9 +18,9 @@ defineModule(sim, list(
   reqdPkgs = list(
     "assertthat", "cowplot", "data.table", "fs", "ggplot2", "googledrive", "httr2",
     "FOR-CAST/fireregimetools@main (>= 0.1.0.9001)", ## fetch_nfdb_points()
-    "purrr", "qs2", "RColorBrewer", "reproducible", "terra", "tidyterra",
+    "purrr", "qs2", "RColorBrewer", "reproducible", "sf", "terra", "tidyterra",
     "raster", "rasterVis", ## TODO: remove these once fireSenseUtils::plotCumulativeBurns switched to ggplot2/tidyterra
-    "PredictiveEcology/fireSenseUtils@development (>= 0.2.3.9158)", ## ELFmetricsFilename()
+    "PredictiveEcology/fireSenseUtils@development (>= 0.2.3.9194)", ## ELFmetricsFilename(); 9194: spreadVariancePartition(), commonalityPartition()
     "PredictiveEcology/SpaDES.core@development (>= 3.2.1.9047)", ## dirnamesFromSet(), resolveSimYears(), padYears(); 9047: defineParameter(cacheKey = FALSE)
     "PredictiveEcology/SpaDES.tools@development (>= 2.1.1.9000)"
   ),
@@ -30,7 +30,18 @@ defineModule(sim, list(
                                  "e.g. 'CanESM5_SSP370'. Used in figure filenames (multi mode).")),
     defineParameter("mode", "character", "single", NA, NA,
                     paste("'single': run within a simulation, saving `burnMap` and `burnSummary` at `end(sim)`.",
-                          "'multi': summarize the saved outputs of several replicates in figures.")),
+                          "'multi': summarize the saved outputs of several replicates in figures.",
+                          "'variancePartition': at `end(sim)`, how much of the fire signal each part of the spread model carries",
+                          "(climate, fuel, young stands, non-forest), between years and within years, for the ELF of the run",
+                          "(`variancePartition()`); written to `variancePartition.csv` in `outputPath(sim)`, with a figure per",
+                          "ELF and method.")),
+    defineParameter("commonalityLedgers", "character", NA_character_, NA, NA,
+                    desc = paste("(mode = 'variancePartition') the spread ledger files of four fits of the ELF, named `none`,",
+                                 "`climate`, `fuel` and `climateFuel` (no covariate, climate only, fuel only, both), e.g. the",
+                                 "files of FireSenseTesting's trials; read from `commonalityLedgerFolder`, the rows within",
+                                 "`studyArea`. `NA` (default): no commonality partition, only the model-based one.")),
+    defineParameter("commonalityLedgerFolder", "character", fireSenseUtils::spreadFitLedgerFolder(testing = TRUE), NA, NA,
+                    desc = "(mode = 'variancePartition') the Google Drive folder of `commonalityLedgers`."),
     defineParameter("simOutputPath", "character", outputPath(sim), NA, NA,
                     desc = paste("Directory holding the replicate output directories, and where figures are written (multi mode).",
                                  "Not part of the event cache key: in multi mode, which reads the replicate folders under it,",
@@ -106,7 +117,20 @@ defineModule(sim, list(
                               "locates the burn maps and summaries. If missing, `simOutputPath` is searched."),
                  sourceURL = NA),
     expectsInput(".ELFind", "character", sourceURL = NA,
-                 "Optional; single mode. The ELF of this run, recorded in its metrics row."),
+                 paste("Optional; single mode. The ELF of this run, recorded in its metrics row.",
+                       "Mode 'variancePartition': the ELFs (ledger rows) partitioned; `NULL`: every row.")),
+    expectsInput("studyAreaWithSpreadParams", "data.frame", sourceURL = NA,
+                 paste("Required in mode 'variancePartition'. The spread ledger rows of the study area, from",
+                       "`fireSense_dataPrepFit`.")),
+    expectsInput("fireSense_annualSpreadFitCovariates", "list", sourceURL = NA,
+                 paste("Required in mode 'variancePartition'. The annual (climate) covariates of the spread fit, one",
+                       "table per year, from `fireSense_dataPrepFit`.")),
+    expectsInput("fireSense_nonAnnualSpreadFitCovariates", "list", sourceURL = NA,
+                 paste("Required in mode 'variancePartition'. The non-annual (fuel) covariates of the spread fit, one",
+                       "table per data year, from `fireSense_dataPrepFit`.")),
+    expectsInput("studyArea", "sf", sourceURL = NA,
+                 paste("Mode 'variancePartition' with `commonalityLedgers`: the study area, whose rows of the four",
+                       "ledgers are read (an `sf` or a `SpatVector`).")),
     expectsInput("rasterToMatch", "SpatRaster",
                  "Template raster of the simulations. Required in multi mode.",
                  sourceURL = NA)
@@ -126,7 +150,7 @@ defineModule(sim, list(
 #'
 #' @param sim A `simList`.
 #' @param eventTime Time of the event.
-#' @param eventType `"init"`, `"save_single"`, `"hindcastRecord"` or `"hindcast"`.
+#' @param eventType `"init"`, `"save_single"`, `"hindcastRecord"`, `"hindcast"` or `"variancePartition"`.
 #'
 #' @return The `simList`, invisibly.
 doEvent.fireSense_summary <- function(sim, eventTime, eventType) {
@@ -140,6 +164,8 @@ doEvent.fireSense_summary <- function(sim, eventTime, eventType) {
           ## after the last record, which is at the same time
           sim <- scheduleEvent(sim, end(sim), "fireSense_summary", "hindcast", .last() + 1)
         }
+      } else if (P(sim)$mode == "variancePartition") {
+        sim <- scheduleEvent(sim, end(sim), "fireSense_summary", "variancePartition", .last())
       } else if (P(sim)$mode == "multi" && !is.na(P(sim)$hindcastYear)) {
         sim <- hindcastFigures(sim)
       } else if (P(sim)$mode == "multi") {
@@ -203,6 +229,9 @@ doEvent.fireSense_summary <- function(sim, eventTime, eventType) {
     hindcast = {
       sim <- hindcastSave(sim)
     },
+    variancePartition = {
+      sim <- variancePartitionSave(sim)
+    },
     warning(noEventWarning(sim))
   )
   return(invisible(sim))
@@ -231,11 +260,9 @@ hindcastRepMaps <- c("ignitionProb", "escapeProb")
 #'
 #' @return The `simList`, invisibly, with `mod$hindcastReps` and `mod$hindcastSizes` extended.
 hindcastRecord <- function(sim) {
-  needed <- c("rasterToMatchELF", "rstAnnualBurnID", "ignitionsAndEscapes",
-              if (P(sim)$repMaps) "fireSense_IgAndEscapeProbRas", "ignitionFirePoints", "firePolys", "flammableRTM")
-  missing <- needed[vapply(needed, function(o) is.null(sim[[o]]), logical(1))]
-  if (length(missing))
-    stop("hindcastYear is set, so fireSense_summary needs: ", paste(missing, collapse = ", "))
+  needObjects(sim, c("rasterToMatchELF", "rstAnnualBurnID", "ignitionsAndEscapes",
+                     if (P(sim)$repMaps) "fireSense_IgAndEscapeProbRas", "ignitionFirePoints", "firePolys", "flammableRTM"),
+              "hindcastYear is set")
   repNo <- as.integer(round((time(sim) - P(sim)$hindcastYear) / P(sim)$hindcastInterval)) + 1L
   one <- fireSenseUtils::hindcastSimulated(sim$rstAnnualBurnID, sim$rasterToMatchELF,
                                            sim$ignitionsAndEscapes, P(sim)$escapeSizeHa, coreStart = TRUE)
@@ -384,6 +411,80 @@ hindcastFigures <- function(sim) {
   Plots(burn, fn = fireSenseUtils::plotHindcastMap, nReps = NROW(reps), firePolys = polys, title = title,
         types = P(sim)$.plots, filename = "hindcast_map", path = figurePath(sim))
   invisible(sim)
+}
+
+#' How much of the fire signal each part of the spread model carries (mode 'variancePartition')
+#'
+#' At `end(sim)`, for each ELF of the run (`sim$.ELFind`; every row of `studyAreaWithSpreadParams` without it), writes
+#' `variancePartition.csv` to `outputPath(sim)`, one row per ELF, method, signal and part, and draws one figure per ELF and
+#' method through `Plots()` (`fireSenseUtils::plotSignalPartition()`):
+#'
+#' * method `"model"`: `fireSenseUtils::spreadVariancePartition()` of the ELF's ledger row, over the fit's own pixel-years
+#'   (`fireSenseUtils::spreadDesignByYear()`), signals `"between"` and `"within"` years;
+#' * method `"commonality"`, with `commonalityLedgers`: `fireSenseUtils::commonalityPartition()` of the ELF's rows of the four
+#'   ledgers (`fireSenseUtils::commonalityScores()`).
+#'
+#' @param sim A `simList`.
+#'
+#' @return The `simList`, invisibly, with the file registered in `outputs(sim)`.
+variancePartitionSave <- function(sim) {
+  needObjects(sim, c("studyAreaWithSpreadParams", "fireSense_annualSpreadFitCovariates",
+                     "fireSense_nonAnnualSpreadFitCovariates"), "mode is 'variancePartition' (they come from fireSense_dataPrepFit)")
+  rows <- ledgerRowsOf(sim$studyAreaWithSpreadParams, sim$.ELFind)
+  ELFs <- as.character(rows[[fireSenseUtils::polygonIDTxt]])
+  out <- lapply(ELFs, function(elf) {
+    row <- ledgerRowsOf(rows, elf)
+    design <- fireSenseUtils::spreadDesignByYear(row, sim$fireSense_annualSpreadFitCovariates,
+                                                 sim$fireSense_nonAnnualSpreadFitCovariates)
+    cbind(ELF = elf, method = "model", fireSenseUtils::spreadVariancePartition(row, design))
+  })
+  if (!all(is.na(P(sim)$commonalityLedgers))) {
+    fits <- commonalityRows(sim)
+    out <- c(out, lapply(ELFs, function(elf) {
+      byFit <- lapply(fits, function(r) ledgerRowsOf(r, elf))
+      cbind(ELF = elf, method = "commonality", fireSenseUtils::commonalityPartition(fireSenseUtils::commonalityScores(byFit)))
+    }))
+  }
+  tab <- as.data.frame(data.table::rbindlist(out, fill = TRUE))
+  f <- file.path(outputPath(sim), "variancePartition.csv")
+  data.table::fwrite(tab, f)
+  for (key in unique(paste(tab$ELF, tab$method))) {
+    one <- tab[paste(tab$ELF, tab$method) == key, , drop = FALSE]
+    Plots(one, fn = fireSenseUtils::plotSignalPartition, title = paste(one$ELF[1], one$method[1]),
+          types = P(sim)$.plots, filename = paste0("variancePartition_", one$ELF[1], "_", one$method[1]),
+          path = figurePath(sim))
+  }
+  registerOutputs(f, sim)
+}
+
+## Stop, naming them, when any of the objects `needed` is not in `sim`; `why` says why they are needed
+needObjects <- function(sim, needed, why) {
+  missing <- needed[vapply(needed, function(o) is.null(sim[[o]]), logical(1))]
+  if (length(missing))
+    stop(why, ", so fireSense_summary needs: ", paste(missing, collapse = ", "))
+}
+
+## The rows of ledger rows `rows` (already selected spatially) of the ELFs `ELFs`; every row when `ELFs` is NULL. Stops when an
+## ELF has no row, or more than one.
+ledgerRowsOf <- function(rows, ELFs) {
+  rows <- as.data.frame(rows)
+  if (!length(ELFs)) return(rows)
+  ids <- as.character(rows[[fireSenseUtils::polygonIDTxt]])
+  n <- vapply(as.character(ELFs), function(e) sum(ids == e), integer(1))
+  if (any(n != 1L))
+    stop("mode 'variancePartition': each ELF needs one ledger row; ",
+         paste0(names(n), " has ", n, collapse = ", "))
+  rows[match(as.character(ELFs), ids), , drop = FALSE]
+}
+
+## The rows within `studyArea` of each of the four `commonalityLedgers`, a list named as they are (commonalityScores() checks
+## the names)
+commonalityRows <- function(sim) {
+  sa <- sim$studyArea
+  if (is.null(sa)) stop("mode 'variancePartition' with commonalityLedgers needs sim$studyArea")
+  if (inherits(sa, "SpatVector")) sa <- sf::st_as_sf(sa)
+  lapply(P(sim)$commonalityLedgers, function(f)
+    fireSenseUtils::readSpreadFitLedger(f, P(sim)$commonalityLedgerFolder, domain = sa, destinationPath = inputPath(sim)))
 }
 
 ## The National Fire Database polygon shapefiles, downloaded (once) and unzipped into `dst` by
