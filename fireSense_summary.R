@@ -19,7 +19,7 @@ defineModule(sim, list(
     "assertthat", "cowplot", "data.table", "fs", "ggplot2", "googledrive", "httr2",
     "FOR-CAST/fireregimetools@main (>= 0.1.0.9002)", ## fetch_nfdb_points(); load_nfdb_polys(fire_years = NULL)
     "qs2", "RColorBrewer", "reproducible", "sf", "terra", "tidyterra",
-    "PredictiveEcology/fireSenseUtils@development (>= 0.2.3.9194)", ## TODO: floor set at merge (fireSenseUtils#266); spreadVariancePartition(), commonalityPartition() (9194); plotHistoricFires(escapeSizeHa) (9193); mosaicELFs() (9187); plotELFs(metrics, metric, metricCol, metricRange, metricTitle) (9144); plotHistoricFires(sizeCol = "SIZE_HA"); fireSenseFireCauses; fireCauseCodes() via hindcastObserved(fireCauses); hindcast*(); hindcastObserved()$points, flammableRTM; ELFmetricsFilename(); escapes from burned-area polygons (#187)
+    "PredictiveEcology/fireSenseUtils@development (>= 0.2.3.9197)", ## spreadVariancePartition(), commonalityPartition(), hindcastAnnualAreas() (9197, after fireSenseUtils#266); plotHistoricFires(escapeSizeHa) (9193); mosaicELFs() (9187); plotELFs(metrics, metric, metricCol, metricRange, metricTitle) (9144); plotHistoricFires(sizeCol = "SIZE_HA"); fireSenseFireCauses; fireCauseCodes() via hindcastObserved(fireCauses); hindcast*(); hindcastObserved()$points, flammableRTM; ELFmetricsFilename(); escapes from burned-area polygons (#187)
     "PredictiveEcology/SpaDES.core@development (>= 3.2.1.9077)", ## dirnamesFromSet() named by replicate id, repFiles(), resolveSimYears(), padYears()
     "PredictiveEcology/SpaDES.tools@development (>= 2.1.1.9000)"
   ),
