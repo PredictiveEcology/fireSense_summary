@@ -37,16 +37,6 @@ test_that("ELFmap mode without ELFs stops, naming them", {
 ## read from NRV_summary's `nrvInside.csv` (columns poly, group, nTests, nInside, pctInside; one row per group).
 ## `nTests`/`nInside` are of the whole ELF; `stand` says how many of them are stand-level tests.
 
-writeNrvFixture <- function(path, elf, nTests, nInside, depth = "postprocess/csv", stand = c(nTests, nInside)) {
-  d <- file.path(path, elf, depth)
-  dir.create(d, recursive = TRUE)
-  g <- data.frame(poly = elf, group = c("landscape", "stand"), nTests = c(nTests - stand[1], stand[1]),
-                  nInside = c(nInside - stand[2], stand[2]))
-  g <- g[g$nTests > 0, ]
-  g$pctInside <- 100 * g$nInside / g$nTests
-  utils::write.csv(g, file.path(d, "nrvInside.csv"), row.names = FALSE)
-}
-
 test_that("nrvInsideTable reads the counts from nrvInside.csv, wherever below the ELF's folder it is", {
   nrv <- withr::local_tempdir()
   writeNrvFixture(nrv, "6.4", nTests = 7L, nInside = 2L, stand = c(4L, 1L))
@@ -149,4 +139,38 @@ test_that("ELFmap mode with nrvComparisonPath draws the all-tests map and the st
   tab <- data.table::fread(file.path(out, "ELFmap_insideNRV.csv"))
   expect_identical(tab$nTests, 3L)
   expect_equal(tab$pctInsideStand, 50)
+})
+
+## ELFs with burn maps but no nrvInside.csv (reports made before NRV_summary#32): the burn-probability maps
+## do not need it.
+
+test_that("nrvInsideTable and nrvStandPositions keep their columns when no ELF has the file", {
+  nrv <- withr::local_tempdir()
+  dir.create(file.path(nrv, "9.3"))
+  suppressWarnings(inside <- moduleFun("nrvInsideTable")("9.3", nrv))
+  expect_identical(nrow(inside), 0L)
+  expect_identical(names(inside), c("ELF", "nTests", "nInside", "pctInside", "pctInsideStand"))
+  suppressWarnings(pos <- moduleFun("nrvStandPositions")("9.3", nrv))
+  expect_identical(nrow(pos), 0L)
+  expect_identical(names(pos), c("ELF", "metric", "label", "code"))
+})
+
+test_that("ELFmap mode with nrvComparisonPath but no nrvInside.csv still makes the burn-probability maps", {
+  out <- withr::local_tempdir(); nrv <- withr::local_tempdir()
+  dir.create(file.path(nrv, "6.4"))
+  writeBurnMap(out, "6.4", "meanAnnualCumulBurnMap")
+  expect_warning(seen <- runELFmap(out, params = list(reportedELFs = "6.4", nrvComparisonPath = nrv)),
+                 "no ELF has an nrvInside.csv")
+  expect_identical(names(seen$files), "NRVburnProbability")
+  expect_false(file.exists(file.path(out, "ELFmap_insideNRV.csv")))
+})
+
+test_that("ELFmap mode with nrvInside.csv for only some ELFs maps those and still makes the burn-probability maps", {
+  out <- withr::local_tempdir(); nrv <- withr::local_tempdir()
+  writeNrvFixture(nrv, "6.4", nTests = 3L, nInside = 2L)
+  dir.create(file.path(nrv, "9.3"))
+  writeBurnMap(out, "6.4", "meanAnnualCumulBurnMap"); writeBurnMap(out, "9.3", "meanAnnualCumulBurnMap")
+  suppressWarnings(seen <- runELFmap(out, params = list(nrvComparisonPath = nrv)))
+  expect_identical(names(seen$files$NRVburnProbability), c("6.4", "9.3"))
+  expect_identical(data.table::fread(file.path(out, "ELFmap_insideNRV.csv"), colClasses = list(character = "ELF"))$ELF, "6.4")
 })
