@@ -597,7 +597,7 @@ filesBelow <- function(path, ELF, pattern) list.files(file.path(path, ELF), patt
 #' @param ELFs Character, the ELFs to read.
 #' @param path Folder with one subfolder per ELF.
 #'
-#' @return A `data.table` with `ELF`, `nTests`, `nInside`, `pctInside` (`100 * nInside / nTests`, all groups) and
+#' @return A `data.table` (no rows if no ELF has the file) with `ELF`, `nTests`, `nInside`, `pctInside` (`100 * nInside / nTests`, all groups) and
 #'   `pctInsideStand` (the same over the `stand` group's tests).
 nrvInsideTable <- function(ELFs, path) {
   one <- function(elf) {
@@ -612,7 +612,9 @@ nrvInsideTable <- function(ELFs, path) {
     data.table::data.table(ELF = elf, nTests = sum(inside$nTests), nInside = sum(inside$nInside),
                            pctInsideStand = if (nrow(stand)) 100 * sum(stand$nInside) / sum(stand$nTests) else NA_real_)
   }
-  tab <- data.table::rbindlist(lapply(ELFs, one))
+  ## the empty template keeps the columns when no ELF has the file
+  tab <- data.table::rbindlist(c(list(data.table::data.table(ELF = character(), nTests = integer(), nInside = integer(),
+                                                              pctInsideStand = numeric())), lapply(ELFs, one)))
   tab$pctInside <- 100 * tab$nInside / tab$nTests
   data.table::setcolorder(tab, c("ELF", "nTests", "nInside", "pctInside", "pctInsideStand"))
   tab
@@ -645,7 +647,8 @@ nrvStandPositions <- function(ELFs, path) {
     data.table::data.table(ELF = rep(elf, nrow(cmp)), metric = cmp$metric, label = cmp$label,
                            code = c(below = -1, inside = 0, above = 1)[cmp$position])
   }
-  data.table::rbindlist(lapply(ELFs, one))
+  data.table::rbindlist(c(list(data.table::data.table(ELF = character(), metric = character(), label = character(),
+                                                       code = numeric())), lapply(ELFs, one)))
 }
 
 #' Map of Canada's ELFs with `reportedELFs` filled (mode = 'ELFmap')
@@ -677,18 +680,23 @@ reportedELFsMap <- function(sim) {
     drawMap(list(fill = "green"), "ELFmap")
   } else {
     inside <- nrvInsideTable(P(sim)$reportedELFs, P(sim)$nrvComparisonPath)
-    data.table::fwrite(inside, file.path(P(sim)$simOutputPath, "ELFmap_insideNRV.csv"))
-    nrvColours <- function(metric, title)
-      list(metrics = inside, metric = metric, metricCol = grDevices::hcl.colors(100, "RdYlGn"),
-           metricRange = c(0, 100), metricTitle = title)
-    drawMap(nrvColours("pctInside", "% of tests\ninside the NRV"), "ELFmap")
-    drawMap(nrvColours("pctInsideStand", "% of stand tests\ninside the NRV"), "ELFmap_stand")
-    positions <- nrvStandPositions(P(sim)$reportedELFs, P(sim)$nrvComparisonPath)
-    for (m in unique(positions$metric)) {
-      pm <- positions[positions$metric == m, ]
-      drawMap(list(fill = NA, metrics = pm, metric = "code", metricCol = positionColours, metricRange = c(-1, 1),
-                   metricTitle = paste0(pm$label[1], "\n-1 below \u00b7 0 inside \u00b7 1 above")),
-              paste0("ELFmap_st_", gsub("[^A-Za-z0-9_.-]", "_", m)))
+    if (!nrow(inside)) {
+      warning("no ELF has an nrvInside.csv below ", P(sim)$nrvComparisonPath, "; the NRV maps are not made",
+              call. = FALSE)
+    } else {
+      data.table::fwrite(inside, file.path(P(sim)$simOutputPath, "ELFmap_insideNRV.csv"))
+      nrvColours <- function(metric, title)
+        list(metrics = inside, metric = metric, metricCol = grDevices::hcl.colors(100, "RdYlGn"),
+             metricRange = c(0, 100), metricTitle = title)
+      drawMap(nrvColours("pctInside", "% of tests\ninside the NRV"), "ELFmap")
+      drawMap(nrvColours("pctInsideStand", "% of stand tests\ninside the NRV"), "ELFmap_stand")
+      positions <- nrvStandPositions(P(sim)$reportedELFs, P(sim)$nrvComparisonPath)
+      for (m in unique(positions$metric)) {
+        pm <- positions[positions$metric == m, ]
+        drawMap(list(fill = NA, metrics = pm, metric = "code", metricCol = positionColours, metricRange = c(-1, 1),
+                     metricTitle = paste0(pm$label[1], "\n-1 below \u00b7 0 inside \u00b7 1 above")),
+                paste0("ELFmap_st_", gsub("[^A-Za-z0-9_.-]", "_", m)))
+      }
     }
   }
   if (isTRUE(P(sim)$burnProbabilityMap)) burnProbabilityMaps(sim)
