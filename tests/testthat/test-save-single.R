@@ -39,6 +39,24 @@ test_that("single mode writes the burn map, summary and metrics row, named for e
   expect_equal(dt$sizeHa, c(10, 20, 30))
 })
 
+test_that("a run without fire writes an empty burn summary", {
+  ## fireSense_burn leaves burnSummary NULL when nothing burned; a one-year hindcast run
+  ## without fire failed here (fwrite: is.list(x) is not TRUE)
+  out <- withr::local_tempdir()
+  s <- SpaDES.core::simInit(
+    times = list(start = 2011, end = 2011),
+    params = list(fireSense_summary = list(mode = "single")),
+    modules = "fireSense_summary",
+    objects = list(burnMap = toyBurnMap()),
+    paths = list(modulePath = modulePath, outputPath = out,
+                 cachePath = file.path(out, "cache"), inputPath = file.path(out, "in"))
+  )
+  SpaDES.core::spades(s, debug = FALSE)
+  f <- file.path(out, "fireSense_burnSummary.csv")
+  expect_true(file.exists(f))
+  expect_identical(NROW(suppressWarnings(data.table::fread(f))), 0L)
+})
+
 test_that("all written files are registered in outputs(sim)", {
   ## registerOutputs() is what makes these files discoverable by a later multi-mode
   ## run via `outputsDF`; if it stops happening the summary silently sees nothing.
@@ -82,9 +100,7 @@ test_that("single-mode init schedules exactly one save_single at end(sim)", {
   ## inside init) and so must never write burn maps.
   s <- makeSingleSim()
   before <- SpaDES.core::events(s)
-  after <- SpaDES.core::events(
-    s$.mods$fireSense_summary$doEvent.fireSense_summary(s, SpaDES.core::start(s), "init")
-  )
+  after <- SpaDES.core::events(runInit(s))
   added <- after[!after$eventType %in% before$eventType, ]
   expect_identical(NROW(added), 1L)
   expect_identical(added$eventType, "save_single")
@@ -113,6 +129,10 @@ test_that("the metrics row names the run, the ELF and the fits, then fires and a
   s$burnSummary <- burnSummary   # fireSense_burn's columns, not the toy's
   SpaDES.core::P(s, module = "fireSense_summary", ".runName") <- "4.10_NRV_370_1"
   s <- withFitModules(s)
+  ## "latest": each ELF's fit is from the file latestIgnitionFits() named (fireSense_ELFs keeps it as an attribute);
+  ## the metrics row recorded instead the file a new fit would be written to. Other ELFs' files do not count.
+  s$fireSense_IgnitionFittedList <- structure(list(`4.10` = list()),
+                                              ignitionFitFiles = c(`4.10` = "ig_gpscCause_20261029.rds", `5.1` = "ig_other.rds"))
   SpaDES.core::spades(s, debug = FALSE)
 
   row <- data.table::fread(file.path(SpaDES.core::outputPath(s), "ELFmetrics_4.10_NRV_370_1.csv"),
@@ -120,10 +140,55 @@ test_that("the metrics row names the run, the ELF and the fits, then fires and a
   expect_identical(row$runName, "4.10_NRV_370_1")
   expect_identical(row$ELF, "4.10")
   expect_identical(row$spreadFitFile, "fireSenseParams_x.rds")                         # named: used as it is
-  expect_identical(row$ignitionFitFile, fireSenseUtils::ignitionFitFilenameFor(1986:2024, "_t"))  # "latest": resolved
+  expect_identical(row$ignitionFitFile, "ig_gpscCause_20261029.rds")                   # "latest": the file read
   expect_equal(row$burnYears, 3)                                                       # 2011, 2012, 2013
   expect_equal(row$firesPerYear, 4 / 3)
   expect_equal(row$areaBurnedHaPerYear, 40)
+})
+
+test_that("a run over several ELFs still writes one metrics row, naming all of them", {
+  s <- makeSingleSim(.ELFind = c("6.6.1", "6.6.2"))
+  SpaDES.core::spades(s, debug = FALSE)
+  out <- SpaDES.core::outputPath(s)
+  row <- data.table::fread(file.path(out, paste0("ELFmetrics_", basename(out), ".csv")))
+  expect_identical(NROW(row), 1L)       # was 2: data.table() recycled the other columns over .ELFind
+  expect_identical(row$ELF, "6.6.1, 6.6.2")
+})
+
+test_that("a run with a .studyAreaName is named by it in its metrics row, not by its ELFs", {
+  s <- makeSingleSim(.ELFind = c("6.6.1", "6.6.2"))
+  SpaDES.core::params(s)$fireSense_summary$.studyAreaName <- "Mixedwood Plains"
+  SpaDES.core::spades(s, debug = FALSE)
+  out <- SpaDES.core::outputPath(s)
+  row <- data.table::fread(file.path(out, paste0("ELFmetrics_", basename(out), ".csv")))
+  expect_identical(row$ELF, "Mixedwood Plains")
+})
+
+test_that("with \"latest\" but no record of the files read, the ledger files are NA, not a made-up name", {
+  s <- withFitModules(makeSingleSim(.ELFind = "4.10"), ignitionFitFilename = "latest")
+  s@params$fireSense_spreadFit$spreadFitFilename <- "latest"
+  s$spreadFitPreRun <- structure(data.frame(polygonID = c("4.10", "6.2")),
+                                 spreadFitFiles = c(`4.10` = "sp_a_20261029.rds", `6.2` = "sp_b_20261101.rds"))
+  SpaDES.core::spades(s, debug = FALSE)
+  out <- SpaDES.core::outputPath(s)
+  row <- data.table::fread(file.path(out, paste0("ELFmetrics_", basename(out), ".csv")))
+  expect_identical(row$spreadFitFile, "sp_a_20261029.rds")
+  expect_true(is.na(row$ignitionFitFile))
+})
+
+test_that("the metrics row records when the run's own ELFs' fits were written", {
+  ## readELFmetrics() keeps each ELF's runs with the newest fits by this, since ledger file names are labels
+  s <- withFitModules(makeSingleSim(.ELFind = "4.10"), ignitionFitFilename = "latest")
+  s$spreadFitPreRun <- data.frame(polygonID = c("4.10", "6.2"),
+                                  writtenAt = as.POSIXct(c("2026-10-29 10:00:00", "2026-11-05 10:00:00"), tz = "UTC"))
+  s$fireSense_IgnitionFittedList <- structure(list(`4.10` = list()), ignitionFitWrittenAt =
+    c(`4.10` = as.POSIXct("2026-11-01 08:30:00", tz = "UTC"), `6.2` = as.POSIXct("2026-11-09 08:30:00", tz = "UTC")))
+  SpaDES.core::spades(s, debug = FALSE)
+  out <- SpaDES.core::outputPath(s)
+  row <- data.table::fread(file.path(out, paste0("ELFmetrics_", basename(out), ".csv")),
+                           colClasses = list(character = c("spreadFitWrittenAt", "ignitionFitWrittenAt")))
+  expect_identical(row$spreadFitWrittenAt, "2026-10-29 10:00:00")     # 4.10's, not 6.2's
+  expect_identical(row$ignitionFitWrittenAt, "2026-11-01 08:30:00")
 })
 
 test_that("without the fit modules the ledger files are NA, and the run is named after outputPath", {
@@ -164,7 +229,9 @@ test_that("simOutputPath is not in the init event's cache key: a run that differ
     out <- withr::local_tempdir(.local_envir = parent.frame())
     s <- SpaDES.core::simInit(
       times = list(start = 2011, end = 2013),
-      params = list(fireSense_summary = list(mode = "single", simOutputPath = simOutputPath, .useCache = "init")),
+      ## `.neverCache` lists init (a cache hit would write nothing); emptied here, to test the key alone
+      params = list(fireSense_summary = list(mode = "single", simOutputPath = simOutputPath, .useCache = "init",
+                                             .neverCache = character())),
       modules = "fireSense_summary",
       objects = list(burnMap = toyBurnMap(), burnSummary = toyBurnSummary()),
       paths = list(modulePath = modulePath, outputPath = out, cachePath = cachePath, inputPath = file.path(out, "in")))

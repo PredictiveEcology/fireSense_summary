@@ -4,11 +4,12 @@
 ## network -- but everything before those calls is pure bookkeeping over its inputs
 ## and is tested here on toy objects.
 
+## A multi-mode simList over the toy template, with supplied observed fires and (by default) outputsDF.
 makeMultiSim <- function(firePolys = toyFirePolys(), outputsDF = NULL, reps = 1L,
                          years = c(NA_integer_, NA_integer_),
                          times = list(start = 2011, end = 2013),
                          simOutputPath = NULL, objects = list(),
-                         ignitionFirePoints = toyIgnitionPoints()) {
+                         ignitionFirePoints = toyIgnitionPoints(), escapeSizeHa = NULL) {
   out <- withr::local_tempdir(.local_envir = parent.frame())
   if (is.null(simOutputPath)) simOutputPath <- out
   if (is.null(outputsDF)) {
@@ -29,16 +30,17 @@ makeMultiSim <- function(firePolys = toyFirePolys(), outputsDF = NULL, reps = 1L
   if (!is.null(firePolys)) objs$firePolys <- firePolys
   SpaDES.core::simInit(
     times = times,
-    params = list(fireSense_summary = list(
+    params = list(fireSense_summary = c(list(
       mode = "multi", reps = reps, simOutputPath = simOutputPath,
-      studyAreaName = "toySA", years = years
-    )),
+      .studyAreaName = "toySA", years = years
+    ), if (!is.null(escapeSizeHa)) list(escapeSizeHa = escapeSizeHa))),
     modules = "fireSense_summary",
     objects = objs,
     paths = list(modulePath = modulePath, outputPath = out,
                  cachePath = file.path(out, "cache"), inputPath = file.path(out, "in"))
   )
 }
+
 
 test_that("with outputsDF, simFiles are the matching rep files and nothing else", {
   s <- runInitMulti(makeMultiSim(reps = 1L))
@@ -48,8 +50,8 @@ test_that("with outputsDF, simFiles are the matching rep files and nothing else"
   ## rep2 is dropped (not in `reps`), and the .png is dropped by the extension filter
   expect_identical(basename(m$simFiles),
                    c("burnMap_year2013.tif", "fireSense_burnSummary.csv"))
-  ## unname(): SpaDES.core >= 3.2.1.9077 names dirnamesFromSet() results by replicate id
-  expect_identical(unname(m$allReps), "rep1")
+  ## named by replicate id (SpaDES.core >= 3.2.1.9077)
+  expect_identical(m$allReps, c("1" = "rep1"))
   ## simFiles is exactly bmbs -- the paths handed to the plotting functions
   expect_identical(m$simFiles, m$bmbs)
 })
@@ -57,16 +59,25 @@ test_that("with outputsDF, simFiles are the matching rep files and nothing else"
 test_that("reps selects which replicate directories are used", {
   s <- runInitMulti(makeMultiSim(reps = 1L:2L))
   m <- modOf(s)
-  expect_identical(unname(m$allReps), c("rep1", "rep2"))
+  expect_identical(m$allReps, c("1" = "rep1", "2" = "rep2"))
   expect_equal(length(m$simFiles), 3L) ## two rep1 files + one rep2 file
   expect_true(any(grepl("/rep2/", m$simFiles)))
+})
 
-  ## NOT asserted: what happens when `reps` names a replicate that produced nothing.
-  ## SpaDES.core::dirnamesFromSet() returns the bare prefix "rep" for an empty
-  ## match, and the `(rep)` alternation InitMulti() then builds matches every rep
-  ## directory, so asking for rep3 alone yields all three rep1/rep2 files. That is
-  ## upstream behaviour in SpaDES.core, not this module, and pinning it here would
-  ## enshrine it.
+test_that("a replicate in `reps` with no outputs stops, naming it", {
+  ## With outputsDF it used to take every replicate's files: no folder names made a pattern matching any path.
+  expect_error(runInitMulti(makeMultiSim(reps = c(1L, 3L))), "no outputs in outputsDF for replicate 3")
+})
+
+test_that("a replicate's files are those under its own folder: rep1 is not rep10", {
+  out <- withr::local_tempdir()
+  outputsDF <- data.table::data.table(
+    file = file.path(out, rep(c("rep1", "rep10"), each = 2), c("burnMap_year2013.tif", "fireSense_burnSummary.csv")),
+    saveTime = 2013
+  )
+  m <- modOf(runInitMulti(makeMultiSim(outputsDF = outputsDF, reps = 1L, simOutputPath = out)))
+  expect_identical(m$allReps, c("1" = "rep1"))
+  expect_identical(m$simFiles, outputsDF$file[1:2])
 })
 
 test_that("an all-NA years parameter resolves to the simulation's own start and end", {
@@ -100,31 +111,17 @@ test_that("supplied firePolys are bound into one SpatVector with an integer YEAR
   expect_type(fp$YEAR, "integer")
 })
 
-test_that("SIZE_HA is taken from ADJ_HA when present", {
-  s <- runInitMulti(makeMultiSim(firePolys = toyFirePolys("ADJ_HA")))
-  fp <- modOf(s)$firePolys
-  expect_true("SIZE_HA" %in% names(fp))
-  expect_equal(fp$SIZE_HA, c(111, 222))
-})
-
-test_that("SIZE_HA falls back to POLY_HA, from the bound polygons", {
-  ## Regression test. This branch used to read `sim$firePolys`, which is still the
-  ## *list* of annual SpatVectors the input arrived as, so tidyterra::mutate() failed
-  ## with "no applicable method for 'mutate' applied to an object of class list".
-  ## It now reads `mod$firePolys`, matching the ADJ_HA branch above.
-  s <- runInitMulti(makeMultiSim(firePolys = toyFirePolys("POLY_HA")))
-  fp <- modOf(s)$firePolys
-  expect_s4_class(fp, "SpatVector")
-  expect_equal(fp$SIZE_HA, c(111, 222))
-  expect_equal(fp$SIZE_HA, fp$POLY_HA)
-})
-
-test_that("an existing SIZE_HA column is preserved, not recomputed", {
-  fp <- toyFirePolys("ADJ_HA")
-  fp[[1]]$SIZE_HA <- 1
-  fp[[2]]$SIZE_HA <- 2
+test_that("supplied SIZE_HA is passed through, not recomputed from ADJ_HA or POLY_HA", {
+  fp <- toyFirePolys()
+  fp[[1]]$ADJ_HA <- fp[[1]]$POLY_HA <- 1
+  fp[[2]]$ADJ_HA <- fp[[2]]$POLY_HA <- 2
   s <- runInitMulti(makeMultiSim(firePolys = fp))
-  expect_equal(modOf(s)$firePolys$SIZE_HA, c(1, 2))
+  expect_equal(modOf(s)$firePolys$SIZE_HA, c(111, 222))
+})
+
+test_that("the module adds no size column of its own to supplied polygons", {
+  s <- runInitMulti(makeMultiSim(firePolys = toyFirePolys("ADJ_HA")))
+  expect_false("SIZE_HA" %in% names(modOf(s)$firePolys))
 })
 
 test_that("supplied ignitionFirePoints are passed through untouched", {
@@ -155,16 +152,45 @@ test_that("without outputsDF the simOutputPath is globbed, and missing files sto
   expect_match(err, "rep2/fireSense_burnSummary\\.csv", fixed = FALSE)
 })
 
-## NOT TESTED, deliberately: the "files all present" success path of the glob
-## branch. It appears to be unreachable. The `_year(...)` grep on line ~183 drops
-## every path without `_year` in its name, which includes
-## `fireSense_burnSummary.csv`, yet `filesExpected` below requires exactly that
-## file per replicate -- so `filesNeeded$exists` is FALSE for it even when the file
-## is there on disk, and InitMulti() stops. Confirmed by creating the four expected
-## files on disk and calling InitMulti(): it still reports the two .csv files
-## missing. This is pre-existing on `development` (same two greps, same
-## `filesExpected`), is not touched by this PR, and is not asserted here because
-## writing a test around it would enshrine it as correct behaviour.
+test_that("without outputsDF the replicate folders keep the padding found on disk", {
+  ## SpaDES.project experiments write rep01, not rep1; the expected files must be named as on disk.
+  out <- withr::local_tempdir()
+  dir.create(file.path(out, "rep01"))
+  file.create(file.path(out, "rep01", "burnMap_year2013.tif"))
+  s <- makeMultiSim(outputsDF = data.table::data.table(), reps = 1L,
+                    years = c(2011L, 2013L), simOutputPath = out)
+  err <- tryCatch(runInitMulti(s), error = function(e) conditionMessage(e))
+  expect_match(err, "rep01/fireSense_burnSummary\\.csv")
+  expect_false(grepl("rep1/", err, fixed = TRUE))
+})
+
+test_that("without outputsDF, InitMulti() succeeds when every expected file is on disk", {
+  ## The burn summary csv has no `_year` in its name; the year filter must not drop it.
+  out <- withr::local_tempdir()
+  dir.create(file.path(out, "rep01"))
+  file.create(file.path(out, "rep01", c("burnMap_year2013.tif", "fireSense_burnSummary.csv")))
+  s <- makeMultiSim(outputsDF = data.table::data.table(), reps = 1L,
+                    years = c(2011L, 2013L), simOutputPath = out)
+  m <- modOf(runInitMulti(s))
+  expect_identical(m$allReps, c("1" = "rep01"))
+  expect_identical(basename(m$bmbs), c("burnMap_year2013.tif", "fireSense_burnSummary.csv"))
+  ## the plotting functions stop on a NULL `simFiles` ("`simFiles` is required"); it was set only with outputsDF
+  expect_identical(m$simFiles, m$bmbs)
+})
+
+test_that("without outputsDF, a replicate's files are those under its own folder", {
+  ## the replicate number used to match any path containing it: 1 is in rep10 and in _year2013
+  out <- withr::local_tempdir()
+  for (d in c("rep01", "rep10")) {
+    dir.create(file.path(out, d))
+    file.create(file.path(out, d, c("burnMap_year2013.tif", "fireSense_burnSummary.csv")))
+  }
+  s <- makeMultiSim(outputsDF = data.table::data.table(), reps = 1L,
+                    years = c(2011L, 2013L), simOutputPath = out)
+  m <- modOf(runInitMulti(s))
+  expect_identical(m$allReps, c("1" = "rep01"))
+  expect_identical(as.character(dirname(m$bmbs)), rep(file.path(out, "rep01"), 2))
+})
 
 test_that("without ignitionFirePoints they come from fireregimetools, not a hard-coded URL", {
   ## The module used to download `.../fire_pnt/current_version/NFDB_point.zip`, which now returns
@@ -184,3 +210,86 @@ test_that("without ignitionFirePoints they come from fireregimetools, not a hard
   expect_s4_class(modOf(s)$ignitionFirePoints, "SpatVector")
   expect_equal(modOf(s)$ignitionFirePoints$YEAR, c(1990L, 1991L))
 })
+
+test_that("without firePolys the NFDB polygons are clipped to rasterToMatch and an unknown year is dropped", {
+  ## Read whole, the observed area burned and escapes of the multi-mode figures were Canada's; and
+  ## NFDB's YEAR -9999 (unknown) was plotted as a year.
+  got <- list()
+  testthat::local_mocked_bindings(
+    prepInputs = function(url, destinationPath, fun, ...)
+      file.path(destinationPath, "NFDB_poly_1972to2020_20250630.shp"),
+    .package = "reproducible")
+  testthat::local_mocked_bindings(
+    load_nfdb_polys = function(nfdb_shp, study_area, fire_years = NULL, min_size_ha = 1) {
+      got <<- list(shp = nfdb_shp, study_area = study_area, min_size_ha = min_size_ha)
+      p <- terra::vect(c("POLYGON ((0 0, 100 0, 100 100, 0 100, 0 0))",
+                         "POLYGON ((200 200, 300 200, 300 300, 200 300, 200 200))"), crs = "EPSG:3978")
+      p$YEAR <- c(1990L, -9999L); p$SIZE_HA <- c(1, 2); p$MONTH <- c("7", "8"); p$DAY <- c("1", "2")
+      p
+    },
+    .package = "fireregimetools")
+  s <- runInitMulti(makeMultiSim(firePolys = NULL))
+  expect_equal(basename(got$shp), "NFDB_poly_1972to2020_20250630.shp")
+  expect_equal(terra::ext(got$study_area), terra::ext(toyRTM()))
+  expect_equal(got$min_size_ha, 0)
+  expect_equal(modOf(s)$firePolys$YEAR, 1990L)
+  expect_type(modOf(s)$firePolys$MONTH, "integer")
+})
+
+## The observed record is the national NFDB; it must be cut to the study area and carry dated fires only.
+toyOutsideFire <- function() {
+  p <- terra::vect("POLYGON ((5000 5000, 5100 5000, 5100 5100, 5000 5100, 5000 5000))", crs = "EPSG:3978")
+  p$YEAR <- "1992"; p$SIZE_HA <- 333
+  p
+}
+toyUndatedFire <- function() {
+  p <- terra::vect("POLYGON ((100 100, 200 100, 200 200, 100 200, 100 100))", crs = "EPSG:3978")
+  p$YEAR <- "-9999"; p$SIZE_HA <- 444
+  p
+}
+
+test_that("observed fire polygons are only the dated fires inside the study area", {
+  s <- runInitMulti(makeMultiSim(firePolys = c(toyFirePolys(), list(toyOutsideFire(), toyUndatedFire()))))
+  fp <- modOf(s)$firePolys
+  expect_equal(sort(fp$YEAR), c(1990L, 1991L))
+  expect_equal(sort(fp$SIZE_HA), c(111, 222))
+})
+
+test_that("observed ignition points are only the dated fires inside the study area", {
+  pts <- terra::vect(cbind(c(50, 250, 5050, 150), c(50, 250, 5050, 150)), crs = "EPSG:3978")
+  pts$YEAR <- c(1990L, 1991L, 1992L, -9999L)
+  s <- runInitMulti(makeMultiSim(ignitionFirePoints = pts))
+  expect_equal(sort(modOf(s)$ignitionFirePoints$YEAR), c(1990L, 1991L))
+})
+
+test_that("multi mode draws no burn map or per-year burn figure", {
+  called <- list()
+  fig <- withr::local_tempfile(fileext = ".png"); file.create(fig)
+  testthat::local_mocked_bindings(
+    plotHistoricFires = function(...) { called$historic <<- list(...); fig },
+    .package = "fireSenseUtils"
+  )
+  testthat::local_mocked_bindings(
+    plotBurnSummary = function(...) { called$burnSummary <<- TRUE; fig },
+    plotCumulativeBurns = function(...) { called$cumul <<- TRUE; fig },
+    .package = "fireSenseUtils"
+  )
+  s <- makeMultiSim(times = list(start = 2011, end = 2013))
+  s <- SpaDES.core::spades(s)
+  expect_null(called$burnSummary)
+  expect_null(called$cumul)
+  expect_equal(called$historic$pixelSize, 100)
+})
+
+test_that("multi mode gives plotHistoricFires the escape size, as the hindcast validation uses", {
+  called <- list()
+  fig <- withr::local_tempfile(fileext = ".png"); file.create(fig)
+  testthat::local_mocked_bindings(
+    plotHistoricFires = function(...) { called$historic <<- list(...); fig },
+    .package = "fireSenseUtils"
+  )
+  s <- makeMultiSim(times = list(start = 2011, end = 2013), escapeSizeHa = 123)
+  s <- SpaDES.core::spades(s)
+  expect_equal(called$historic$escapeSizeHa, 123)
+})
+

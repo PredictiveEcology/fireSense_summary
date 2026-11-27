@@ -26,7 +26,7 @@ toyBurnSummary <- function() {
 
 ## Two annual fire polygons carrying `areaCol` as their area column, as a *list* --
 ## which is the class the `firePolys` input is declared to have.
-toyFirePolys <- function(areaCol = "ADJ_HA") {
+toyFirePolys <- function(areaCol = "SIZE_HA") {
   p1 <- terra::vect("POLYGON ((0 0, 100 0, 100 100, 0 100, 0 0))", crs = "EPSG:3978")
   p1$YEAR <- "1990"      ## character on purpose: InitMulti() is meant to coerce it
   p1[[areaCol]] <- 111
@@ -49,7 +49,7 @@ toyIgnitionPoints <- function() {
 ## the argument name satisfies both, and works whether or not the module has been
 ## converted to a package.
 runInitMulti <- function(sim) {
-  sim@current <- data.frame(eventTime = start(sim), moduleName = "fireSense_summary",
+  sim@current <- data.frame(eventTime = SpaDES.core::start(sim), moduleName = "fireSense_summary",
                             eventType = "init", eventPriority = 1)
   sim$.mods$fireSense_summary$InitMulti(sim)
 }
